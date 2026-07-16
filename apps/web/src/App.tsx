@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
+import { askOpenRouter, unlockOpenRouterKey } from './aiAccess'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || 'http://localhost:8000'
 
@@ -214,6 +215,10 @@ function App() {
     tags: [],
     avatarUrl: DEFAULT_AVATAR,
   })
+  const [aiKey, setAiKey] = useState<string | null>(null)
+  const [unlockPassword, setUnlockPassword] = useState('')
+  const [unlockError, setUnlockError] = useState('')
+  const [isUnlocking, setIsUnlocking] = useState(false)
 
   const userAvatar = useMemo(() => {
     return profileForm.avatarUrl || DEFAULT_AVATAR
@@ -239,6 +244,20 @@ function App() {
     appendMessages(activeConversationId, updater)
   }
 
+  const unlockAi = async () => {
+    if (!unlockPassword || isUnlocking) return
+    setIsUnlocking(true)
+    setUnlockError('')
+    try {
+      setAiKey(await unlockOpenRouterKey(unlockPassword))
+      setUnlockPassword('')
+    } catch {
+      setUnlockError('密码不正确，请再试一次。')
+    } finally {
+      setIsUnlocking(false)
+    }
+  }
+
   const sendMessage = async (text: string) => {
     const cleanText = text.trim()
     if (!cleanText || isSending) return
@@ -261,7 +280,7 @@ function App() {
       setProfileTurns(nextTurns)
       setProfileSnippets(nextSnippets)
 
-      const profileResult = await extractProfileWithBackend(nextSnippets, cleanText, profileForm, messagesWithUser, nextTurns)
+      const profileResult = await extractProfileWithBackend(nextSnippets, cleanText, profileForm, messagesWithUser, nextTurns, aiKey)
       if (profileResult) {
         const parsedProfile = mapBackendProfileToUserProfile(profileResult.profile, profileForm)
         setProfileForm(parsedProfile)
@@ -292,7 +311,7 @@ function App() {
       return
     }
 
-    const apiReply = await sendToBackend(cleanText, flowStage)
+    const apiReply = await sendToBackend(cleanText, flowStage, aiKey, messagesWithUser, profileForm)
     if (apiReply) {
       applyBackendReply(apiReply)
     } else {
@@ -769,11 +788,19 @@ function App() {
           </form>
         </div>
       )}
+      {!aiKey && <div className="ai-unlock-overlay" role="dialog" aria-modal="true" aria-label="解锁 AI 功能"><section className="ai-unlock-card"><span className="ai-unlock-mark">搭</span><h1>解锁哒哒 AI</h1><p>输入访问密码后，哒哒会直接理解你的介绍、补全校园档案并继续找人找群。密钥只保留在本次页面内存中。</p><form onSubmit={(event) => { event.preventDefault(); void unlockAi() }}><input type="password" autoFocus value={unlockPassword} onChange={(event) => setUnlockPassword(event.target.value)} placeholder="访问密码" /><button type="submit" disabled={isUnlocking}>{isUnlocking ? '正在解锁…' : '解锁并开始'}</button></form>{unlockError && <small>{unlockError}</small>}</section></div>}
     </main>
   )
 }
 
-async function sendToBackend(text: string, stage: FlowStage): Promise<BackendChatReply | null> {
+async function sendToBackend(text: string, stage: FlowStage, apiKey: string | null, recentMessages: ChatItem[], profile: UserProfile): Promise<BackendChatReply | null> {
+  if (apiKey) {
+    try {
+      return await askOpenRouter<BackendChatReply>(apiKey, buildChatPrompt(text, stage, recentMessages, profile), 650)
+    } catch {
+      // Keep a local-backend fallback for development environments.
+    }
+  }
   let sessionId: string | null = getStoredApiSessionId()
   try {
     let response = await fetch(`${API_BASE_URL}/chat/messages`, {
@@ -818,7 +845,15 @@ async function extractProfileWithBackend(
   currentProfile: UserProfile,
   recentMessages: ChatItem[],
   turnCount: number,
+  apiKey: string | null,
 ): Promise<BackendProfileExtractResponse | null> {
+  if (apiKey) {
+    try {
+      return await askOpenRouter<BackendProfileExtractResponse>(apiKey, buildProfilePrompt(messages, latestUserInput, currentProfile, recentMessages, turnCount), 850)
+    } catch {
+      // Keep a local-backend fallback for development environments.
+    }
+  }
   try {
     const response = await fetch(`${API_BASE_URL}/profile/extract`, {
       method: 'POST',
@@ -867,6 +902,22 @@ function buildProfileConversationContext(
     turn_count: turnCount,
     known_profile: mapUserProfileToBackendProfile(currentProfile),
   }
+}
+
+function buildProfilePrompt(
+  snippets: string[],
+  latestUserInput: string,
+  currentProfile: UserProfile,
+  recentMessages: ChatItem[],
+  turnCount: number,
+): string {
+  const context = buildProfileConversationContext(latestUserInput, currentProfile, recentMessages, turnCount)
+  return `你是 AAA哒哒大王，一个微信语气、温柔主动的校园连接助手。根据用户的自然语言介绍提取校园档案；不要编造学校、身份或个人经历。信息不足时只追问一个最关键问题。严格输出 JSON，不要 Markdown，不要额外字段：{"profile":{"nickname":"","school":"","grade":"","major":"","city":"","current_focus":"","seeking":"","tags":[],"confidence_notes":""},"missing_fields":[],"is_sufficient":false,"followup_question":"","natural_summary":"","assistant_reply":""}。当昵称、学校/城市、近况和想找什么基本清楚时 is_sufficient 为 true。\n已收集内容：${snippets.join('\n')}\n上下文：${JSON.stringify(context)}`
+}
+
+function buildChatPrompt(text: string, stage: FlowStage, history: ChatItem[], profile: UserProfile): string {
+  const recentTurns = history.filter((message): message is TextMessage => message.kind === 'text').slice(-8).map((message) => `${message.sender === 'user' ? '用户' : '哒哒'}：${message.text}`).join('\n')
+  return `你是 AAA哒哒大王，微信语气、温柔主动的校园连接助手。根据对话阶段和新消息推进找人找群流程，不要编造真实学生或保证成功。严格输出 JSON，不要 Markdown：{"bot_message":{"text":""},"action":null,"payload":{},"next_stage":null}。action 仅可为 null、show_group_invite、show_second_group_invite、show_candidate_card、open_questionnaire。当用户在 awaitingPrimaryGroupDecision 明确同意进群时，用 show_group_invite，payload 提供 group_name 和 description；其他情况用 null。next_stage 仅可为 null、collecting_profile、awaiting_profile_form_completion、awaiting_primary_group_decision、awaiting_candidate_decision、matching_loop。\n阶段：${stage}\n档案：${JSON.stringify(profile)}\n最近对话：${recentTurns}\n新消息：${text}`
 }
 
 function mapUserProfileToBackendProfile(profile: UserProfile): BackendProfileDraft {
