@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>哒哒校园人格名片 Mobile Mock</title>
+    <style>
+      :root {
+        --ink: #1f2a2a;
+        --muted: #61706d;
+        --paper: #fffaf1;
+        --cream: #f4ead5;
+        --mint: #bce7d6;
+        --mint-deep: #1f8f78;
+        --coral: #f06d56;
+        --coral-deep: #b84235;
+        --lemon: #f4c94f;
+        --sky: #9ed8e8;
+        --line: rgba(31, 42, 42, 0.12);
+        --shadow: 0 18px 42px rgba(37, 49, 43, 0.16);
+        --font-ui: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+          sans-serif;
+        --font-title: "Tsukushi A Round Gothic", "Hiragino Maru Gothic ProN",
+          "PingFang SC", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: var(--font-ui);
+        color: var(--ink);
+        background:
+          linear-gradient(90deg, rgba(31, 42, 42, 0.04) 1px, transparent 1px),
+          linear-gradient(rgba(31, 42, 42, 0.04) 1px, transparent 1px),
+          linear-gradient(135deg, #dff2ec 0%, #fff4dc 48%, #ffd7c5 100%);
+        background-size: 18px 18px, 18px 18px, cover;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .phone {
+        width: 390px;
+        height: 844px;
+        max-width: 100vw;
+        max-height: 100vh;
+        position: relative;
+        overflow: hidden;
+        background: var(--paper);
+        border: 10px solid #182424;
+        border-radius: 34px;
+        box-shadow: var(--shadow);
+      }
+
+      .status-bar {
+        height: 34px;
+        padding: 9px 18px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .signals {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .battery {
+        width: 21px;
+        height: 10px;
+        border: 1.5px solid var(--ink);
+        border-radius: 3px;
+        position: relative;
+      }
+
+      .battery::before {
+        content: "";
+        position: absolute;
+        width: 13px;
+        height: 4px;
+        left: 2px;
+        top: 2px;
+        background: var(--ink);
+        border-radius: 1px;
+      }
+
+      .battery::after {
+        content: "";
+        position: absolute;
+        right: -4px;
+        top: 2px;
+        width: 2px;
+        height: 5px;
+        background: var(--ink);
+        border-radius: 1px;
+      }
+
+      .app {
+        height: calc(100% - 34px);
+        display: grid;
+        grid-template-rows: 1fr 76px;
+      }
+
+      .screen {
+        display: none;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 10px 16px 20px;
+      }
+
+      .screen.active {
+        display: block;
+      }
+
+      .completed-only,
+      #card-screen.is-completed .quiz-active-only,
+      #card-screen.is-completed .unknown-only {
+        display: none;
+      }
+
+      #card-screen.is-completed .completed-only {
+        display: block;
+      }
+
+      #card-screen.is-completed .floating-tags.completed-only {
+        display: block;
+      }
+
+      .screen::-webkit-scrollbar {
+        display: none;
+      }
+
+      .topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .logo {
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 900;
+        background: var(--ink);
+        border: 3px solid #fff;
+        box-shadow: 3px 3px 0 var(--lemon);
+      }
+
+      .brand-text {
+        display: grid;
+        gap: 1px;
+      }
+
+      .brand-text strong {
+        font-family: var(--font-title);
+        font-size: 17px;
+      }
+
+      .brand-text span {
+        font-size: 10px;
+        color: var(--muted);
+      }
+
+      .icon-btn {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.58);
+        color: var(--ink);
+        display: grid;
+        place-items: center;
+      }
+
+      .hero-panel {
+        position: relative;
+        padding: 16px;
+        background:
+          linear-gradient(90deg, rgba(31, 42, 42, 0.06) 1px, transparent 1px),
+          linear-gradient(rgba(31, 42, 42, 0.06) 1px, transparent 1px),
+          linear-gradient(135deg, #bce7d6, #fff2be 55%, #ffb9a8);
+        background-size: 12px 12px, 12px 12px, cover;
+        border: 2px solid var(--ink);
+        border-radius: 8px;
+        box-shadow: 5px 5px 0 rgba(31, 42, 42, 0.88);
+      }
+
+      .hero-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 8px;
+        border: 1.5px solid var(--ink);
+        border-radius: 7px;
+        background: rgba(255, 250, 241, 0.82);
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .hero-title {
+        margin: 11px 0 6px;
+        max-width: 210px;
+        font-family: var(--font-title);
+        font-size: 28px;
+        line-height: 1.08;
+      }
+
+      .hero-copy {
+        max-width: 230px;
+        margin: 0;
+        color: #31413f;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .pixel-person {
+        position: absolute;
+        right: 17px;
+        bottom: 17px;
+        width: 88px;
+        height: 116px;
+      }
+
+      .pixel-head {
+        width: 52px;
+        height: 52px;
+        margin: 0 auto;
+        background:
+          linear-gradient(#2d3532 0 12px, transparent 12px),
+          linear-gradient(90deg, transparent 9px, #27302e 9px 42px, transparent 42px),
+          #ffd6b9;
+        border: 3px solid var(--ink);
+        border-radius: 8px;
+        position: relative;
+        box-shadow: 4px 4px 0 rgba(31, 42, 42, 0.25);
+      }
+
+      .pixel-head::before,
+      .pixel-head::after {
+        content: "";
+        position: absolute;
+        top: 27px;
+        width: 5px;
+        height: 5px;
+        background: var(--ink);
+      }
+
+      .pixel-head::before {
+        left: 13px;
+      }
+
+      .pixel-head::after {
+        right: 13px;
+      }
+
+      .pixel-body {
+        width: 62px;
+        height: 56px;
+        margin: -1px auto 0;
+        background: var(--coral);
+        border: 3px solid var(--ink);
+        border-radius: 8px;
+        position: relative;
+      }
+
+      .pixel-body::before,
+      .pixel-body::after {
+        content: "";
+        position: absolute;
+        top: 13px;
+        width: 17px;
+        height: 34px;
+        background: var(--sky);
+        border: 3px solid var(--ink);
+        border-radius: 6px;
+      }
+
+      .pixel-body::before {
+        left: -16px;
+        transform: rotate(10deg);
+      }
+
+      .pixel-body::after {
+        right: -16px;
+        transform: rotate(-10deg);
+      }
+
+      .pixel-legs {
+        width: 52px;
+        height: 24px;
+        margin: -2px auto 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .pixel-legs span {
+        background: #2f4f54;
+        border: 3px solid var(--ink);
+        border-radius: 5px;
+      }
+
+      .floating-tags {
+        position: relative;
+        min-height: 80px;
+        margin: 14px 0 12px;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 8px;
+        border: 1.5px solid var(--ink);
+        border-radius: 8px;
+        background: #fffdf8;
+        font-size: 11px;
+        font-weight: 800;
+        box-shadow: 3px 3px 0 rgba(31, 42, 42, 0.16);
+        white-space: nowrap;
+      }
+
+      .floating-tags .tag {
+        position: absolute;
+      }
+
+      .floating-tags .tag:nth-child(1) {
+        left: 4px;
+        top: 3px;
+        background: #fff2be;
+      }
+
+      .floating-tags .tag:nth-child(2) {
+        right: 4px;
+        top: 11px;
+        background: #d9f3ea;
+      }
+
+      .floating-tags .tag:nth-child(3) {
+        left: 22px;
+        bottom: 2px;
+        background: #ffd7c5;
+      }
+
+      .floating-tags .tag:nth-child(4) {
+        right: 19px;
+        bottom: 8px;
+        background: #d8f1f7;
+      }
+
+      .section {
+        margin-top: 14px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 9px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-family: var(--font-title);
+        font-size: 18px;
+      }
+
+      .section-head span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .question-card,
+      .oracle-panel,
+      .interpretation-card,
+      .story-card,
+      .profile-grid,
+      .share-strip,
+      .tarot-card {
+        border: 1.5px solid var(--ink);
+        border-radius: 8px;
+        background: rgba(255, 253, 248, 0.94);
+        box-shadow: 4px 4px 0 rgba(31, 42, 42, 0.13);
+      }
+
+      .question-card {
+        padding: 12px;
+      }
+
+      .question-card h3 {
+        margin: 0 0 10px;
+        font-size: 15px;
+        line-height: 1.42;
+      }
+
+      .option-list {
+        display: grid;
+        gap: 7px;
+      }
+
+      .option {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fffdf8;
+        color: var(--ink);
+        text-align: left;
+        display: grid;
+        gap: 5px;
+      }
+
+      .option.active {
+        border-color: var(--ink);
+        background: #fff0be;
+        box-shadow: 3px 3px 0 rgba(31, 42, 42, 0.14);
+      }
+
+      .option strong {
+        font-size: 13px;
+      }
+
+      .option span {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .profile-grid {
+        padding: 10px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .field {
+        padding: 9px;
+        border-radius: 7px;
+        background: #f7f2e6;
+        border: 1px solid rgba(31, 42, 42, 0.08);
+      }
+
+      .field span {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .field strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .share-strip {
+        padding: 11px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+        background: #25312f;
+        color: #fff;
+      }
+
+      .share-strip p {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .card-actions {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 9px;
+        align-items: center;
+      }
+
+      .card-actions .secondary-btn {
+        width: auto;
+        min-height: 36px;
+        padding: 0 12px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .card-actions .primary-btn {
+        min-height: 40px;
+        box-shadow: 3px 3px 0 var(--ink);
+      }
+
+      .qr {
+        width: 54px;
+        height: 54px;
+        border: 4px solid #fff;
+        background:
+          linear-gradient(90deg, #25312f 25%, transparent 25% 50%, #25312f 50% 75%, transparent 75%),
+          linear-gradient(#25312f 25%, transparent 25% 50%, #25312f 50% 75%, transparent 75%),
+          #fff;
+        background-size: 14px 14px;
+      }
+
+      .primary-btn,
+      .secondary-btn {
+        width: 100%;
+        min-height: 44px;
+        border-radius: 8px;
+        font-weight: 900;
+      }
+
+      .primary-btn {
+        border: 2px solid var(--ink);
+        background: var(--coral);
+        color: #fff;
+        box-shadow: 4px 4px 0 var(--ink);
+      }
+
+      .secondary-btn {
+        border: 1.5px solid var(--ink);
+        background: #fffdf8;
+        color: var(--ink);
+      }
+
+      .story-card h3 {
+        margin: 0;
+        font-family: var(--font-title);
+        font-size: 18px;
+      }
+
+      .story-card p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .oracle-panel {
+        padding: 13px;
+        background:
+          linear-gradient(90deg, rgba(31, 42, 42, 0.06) 1px, transparent 1px),
+          linear-gradient(rgba(31, 42, 42, 0.06) 1px, transparent 1px),
+          linear-gradient(135deg, #fff7df, #dff4ec 54%, #ffd5c5);
+        background-size: 12px 12px, 12px 12px, cover;
+      }
+
+      .oracle-panel h2,
+      .interpretation-card h3 {
+        margin: 0;
+        font-family: var(--font-title);
+      }
+
+      .oracle-panel h2 {
+        font-size: 22px;
+      }
+
+      .oracle-panel p,
+      .interpretation-card p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .question-input {
+        width: 100%;
+        min-height: 48px;
+        margin-top: 12px;
+        padding: 11px;
+        border: 1.5px solid var(--ink);
+        border-radius: 8px;
+        background: #fffdf8;
+        color: var(--ink);
+        outline: none;
+      }
+
+      .question-input:focus {
+        box-shadow: 3px 3px 0 rgba(31, 42, 42, 0.16);
+      }
+
+      .card-stream {
+        height: 96px;
+        margin: 14px 0;
+        position: relative;
+        display: grid;
+        place-items: center;
+      }
+
+      .shuffle-card {
+        position: absolute;
+        width: 58px;
+        height: 88px;
+        border: 2px solid var(--ink);
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, rgba(31, 42, 42, 0.12) 1px, transparent 1px),
+          linear-gradient(rgba(31, 42, 42, 0.12) 1px, transparent 1px),
+          #25312f;
+        background-size: 10px 10px;
+        box-shadow: 4px 4px 0 rgba(31, 42, 42, 0.25);
+        animation: shuffleFloat 1.05s ease-in-out infinite alternate;
+      }
+
+      .shuffle-card:nth-child(1) {
+        transform: translateX(-72px) rotate(-12deg);
+        animation-delay: 0s;
+      }
+
+      .shuffle-card:nth-child(2) {
+        transform: translateX(0) rotate(3deg);
+        animation-delay: 0.16s;
+      }
+
+      .shuffle-card:nth-child(3) {
+        transform: translateX(72px) rotate(13deg);
+        animation-delay: 0.32s;
+      }
+
+      @keyframes shuffleFloat {
+        from {
+          margin-top: 8px;
+        }
+
+        to {
+          margin-top: -8px;
+        }
+      }
+
+      .tarot-spread {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .tarot-card {
+        min-height: 154px;
+        padding: 7px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 6px;
+        background: #fffdf8;
+      }
+
+      .tarot-card:nth-child(2) {
+        background: #fff4cf;
+      }
+
+      .tarot-card:nth-child(3) {
+        background: #e3f4f0;
+      }
+
+      .card-no,
+      .card-role {
+        font-size: 10px;
+        font-weight: 900;
+        color: var(--muted);
+      }
+
+      .card-art {
+        display: grid;
+        place-items: center;
+        border: 1.5px solid var(--ink);
+        border-radius: 6px;
+        background:
+          linear-gradient(90deg, rgba(31, 42, 42, 0.06) 1px, transparent 1px),
+          linear-gradient(rgba(31, 42, 42, 0.06) 1px, transparent 1px),
+          #f7f2e6;
+        background-size: 8px 8px;
+        font-size: 30px;
+        line-height: 1;
+      }
+
+      .tarot-card h3 {
+        margin: 0;
+        font-family: var(--font-title);
+        font-size: 14px;
+        line-height: 1.15;
+      }
+
+      .tarot-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.35;
+      }
+
+      .interpretation-card {
+        padding: 12px;
+        background: #25312f;
+        color: #fff;
+      }
+
+      .interpretation-card h3 {
+        font-size: 17px;
+      }
+
+      .interpretation-card p {
+        color: rgba(255, 255, 255, 0.78);
+      }
+
+      .friend-preview {
+        display: grid;
+        gap: 8px;
+      }
+
+      .friend-preview .tarot-card {
+        min-height: 118px;
+      }
+
+      .bonus-card-wrap {
+        display: grid;
+        grid-template-columns: 104px 1fr;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .bonus-card-wrap .tarot-card {
+        min-height: 144px;
+      }
+
+      .bonus-copy {
+        padding: 10px;
+        border: 1.5px solid var(--ink);
+        border-radius: 8px;
+        background: #fff7e4;
+        display: grid;
+        align-content: center;
+        gap: 7px;
+      }
+
+      .bonus-copy strong {
+        font-family: var(--font-title);
+        font-size: 16px;
+      }
+
+      .bonus-copy span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .prophecy-option {
+        width: 100%;
+        padding: 10px;
+        border: 1.5px solid var(--line);
+        border-radius: 8px;
+        background: #fffdf8;
+        color: var(--ink);
+        text-align: left;
+        font-weight: 800;
+      }
+
+      .prophecy-option.active {
+        border-color: var(--ink);
+        background: #dff4ec;
+        box-shadow: 3px 3px 0 rgba(31, 42, 42, 0.14);
+      }
+
+      .completed-reading {
+        background: #203935;
+      }
+
+      .story-card {
+        padding: 12px;
+      }
+
+      .story-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .avatars {
+        display: flex;
+        align-items: center;
+      }
+
+      .avatar-dot {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border: 2px solid var(--ink);
+        border-radius: 8px;
+        background: var(--mint);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .avatar-dot + .avatar-dot {
+        margin-left: -7px;
+        background: var(--lemon);
+      }
+
+      .story-type {
+        padding: 5px 7px;
+        border-radius: 7px;
+        background: #eef6f4;
+        color: var(--mint-deep);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .timeline {
+        margin-top: 10px;
+        display: grid;
+        gap: 7px;
+      }
+
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 20px 1fr;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+      }
+
+      .dot {
+        width: 13px;
+        height: 13px;
+        border: 2px solid var(--ink);
+        border-radius: 50%;
+        background: var(--coral);
+      }
+
+      .friend-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .friend-actions .secondary-btn,
+      .friend-actions .primary-btn {
+        min-height: 40px;
+        box-shadow: none;
+      }
+
+      .comment-wall {
+        display: grid;
+        gap: 8px;
+      }
+
+      .quote {
+        padding: 10px;
+        border-left: 5px solid var(--coral);
+        border-radius: 7px;
+        background: #fff7e4;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .bottom-nav {
+        height: 76px;
+        padding: 8px 14px 12px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        border-top: 1px solid var(--line);
+        background: rgba(255, 250, 241, 0.92);
+        backdrop-filter: blur(12px);
+      }
+
+      .nav-btn {
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+        gap: 3px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .nav-btn.active {
+        background: var(--ink);
+        color: #fff;
+      }
+
+      .nav-icon {
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      @media (max-width: 430px) {
+        body {
+          display: block;
+          background: var(--paper);
+        }
+
+        .phone {
+          width: 100vw;
+          height: 100vh;
+          max-height: none;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="phone" aria-label="哒哒校园人格名片手机竖版原型">
+      <div class="status-bar">
+        <span>18:40</span>
+        <span class="signals">5G <span class="battery"></span></span>
+      </div>
+
+      <div class="app">
+        <section class="screen active" id="card-screen">
+          <header class="topline">
+            <div class="brand">
+              <div class="logo">搭</div>
+              <div class="brand-text">
+                <strong>我卡</strong>
+                <span id="card-subtitle">先答题，再生成名片</span>
+              </div>
+            </div>
+            <button class="icon-btn" aria-label="编辑名片">✎</button>
+          </header>
+
+          <div class="hero-panel">
+            <span class="hero-kicker" id="card-id">DADA-ID 待生成</span>
+            <h1 class="hero-title" id="persona-title">未知角色</h1>
+            <p class="hero-copy" id="persona-copy">
+              先回答几道校园选择题，哒哒大王会把你捏成一张可以分享给老友预言的大学人格名片。
+            </p>
+            <div class="pixel-person" aria-hidden="true">
+              <div class="pixel-head"></div>
+              <div class="pixel-body"></div>
+              <div class="pixel-legs"><span></span><span></span></div>
+            </div>
+          </div>
+
+          <div class="floating-tags completed-only" aria-label="趣味标签">
+            <span class="tag">食堂盲盒启动者</span>
+            <span class="tag">真诚跑调人</span>
+            <span class="tag">菜但瘾大</span>
+            <span class="tag">艺术装懂</span>
+          </div>
+
+          <section class="section quiz-active-only">
+            <div class="section-head">
+              <h2>开始答题</h2>
+              <span>1 / 8</span>
+            </div>
+            <div class="question-card">
+              <h3>开学第一顿饭，你最可能？</h3>
+              <div class="option-list">
+                <button class="option active">
+                  <strong>食堂盲盒启动</strong>
+                  <span>难吃也是校园体验的一部分。</span>
+                </button>
+                <button class="option">
+                  <strong>你们决定，我负责说好吃</strong>
+                  <span>选择困难，但很好约。</span>
+                </button>
+                <button class="option">
+                  <strong>先查评分最高的店</strong>
+                  <span>大学四年不能输在第一口饭。</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="section quiz-active-only">
+            <button class="primary-btn" id="finish-quiz-btn">完成答题，生成我卡</button>
+          </section>
+
+          <section class="section completed-only">
+            <div class="section-head">
+              <h2>真实资料</h2>
+              <span>可控制展示</span>
+            </div>
+            <div class="profile-grid">
+              <div class="field"><span>年龄</span><strong>18</strong></div>
+              <div class="field"><span>家乡</span><strong>浙江杭州</strong></div>
+              <div class="field"><span>学校</span><strong>未来大学</strong></div>
+              <div class="field"><span>专业年级</span><strong>计算机 大一</strong></div>
+              <div class="field"><span>技能</span><strong>PPT / 拍照 / 破冰</strong></div>
+              <div class="field"><span>兴趣</span><strong>音乐 / 桌游 / 逛展</strong></div>
+            </div>
+          </section>
+
+          <section class="section completed-only">
+            <div class="section-head">
+              <h2>好友辣评</h2>
+              <span>可选择展示</span>
+            </div>
+            <div class="comment-wall">
+              <div class="quote">“大学室友请注意：此人夜聊能力很强。”</div>
+              <div class="quote">“他真的会因为一顿饭和人熟起来。”</div>
+              <div class="quote">“别信她说随便，她最挑。”</div>
+            </div>
+          </section>
+
+          <section class="section completed-only">
+            <div class="share-strip">
+              <p>
+                你认识我这么久，来预测一下我大学会变成什么人。
+              </p>
+              <div class="qr" aria-label="分享二维码示意"></div>
+            </div>
+          </section>
+
+          <section class="section completed-only">
+            <div class="card-actions">
+              <button class="secondary-btn" id="redo-quiz-btn">重新答题</button>
+              <button class="primary-btn">分享角色卡</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="screen" id="branch-screen">
+          <header class="topline">
+            <div class="brand">
+              <div class="logo">支</div>
+              <div class="brand-text">
+                <strong>支线</strong>
+                <span>校园命运牌正在洗牌</span>
+              </div>
+            </div>
+            <button class="icon-btn" aria-label="命运牌册">□</button>
+          </header>
+
+          <section class="section">
+            <div class="oracle-panel">
+              <span class="hero-kicker">大学四年塔罗支线</span>
+              <h2>向你的大学生活问一个问题</h2>
+              <p>默认问题适合新生入学前：先问一个未来场景，再抽三张校园命运牌。</p>
+              <input
+                class="question-input"
+                id="oracle-question"
+                value="大学的第一个crush"
+                aria-label="想问大学生活的问题"
+              />
+              <div class="card-stream" aria-hidden="true">
+                <span class="shuffle-card"></span>
+                <span class="shuffle-card"></span>
+                <span class="shuffle-card"></span>
+              </div>
+              <button class="primary-btn" id="draw-btn">抽取三张校园命运牌</button>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>本次牌阵</h2>
+              <span>起点 / 触发 / 走向</span>
+            </div>
+            <div class="tarot-spread" id="tarot-spread">
+              <div class="tarot-card">
+                <span class="card-no">NO.07 起点</span>
+                <div class="card-art">□</div>
+                <h3>图书馆空位</h3>
+                <p>有人刚好坐在你的日常旁边。</p>
+              </div>
+              <div class="tarot-card">
+                <span class="card-no">NO.14 触发</span>
+                <div class="card-art">☂</div>
+                <h3>雨天共伞</h3>
+                <p>天气会替嘴硬的人制造借口。</p>
+              </div>
+              <div class="tarot-card">
+                <span class="card-no">NO.21 走向</span>
+                <div class="card-art">…</div>
+                <h3>没说出口的话</h3>
+                <p>关系开始变得不太普通。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="interpretation-card" id="oracle-reading">
+              <h3>简短解读</h3>
+              <p>
+                你的第一次心动大概率不是一眼万年，而是从一个“刚好”开始。真正让你上头的，是后来那句没说出口的话。
+              </p>
+            </div>
+          </section>
+
+          <section class="section">
+            <button class="secondary-btn" id="share-interpret-btn">发给好友抽取加注卡牌</button>
+          </section>
+        </section>
+
+        <section class="screen" id="friend-oracle-screen">
+          <header class="topline">
+            <div class="brand">
+              <div class="logo">解</div>
+              <div class="brand-text">
+                <strong>好友解读</strong>
+                <span>抽一张老友加注牌</span>
+              </div>
+            </div>
+            <button class="icon-btn" id="back-to-branch-btn" aria-label="返回支线">←</button>
+          </header>
+
+          <section class="section">
+            <div class="story-card">
+              <div class="story-meta">
+                <div class="avatars">
+                  <span class="avatar-dot">TA</span>
+                  <span class="avatar-dot">友</span>
+                </div>
+                <span class="story-type">待解读</span>
+              </div>
+              <h3 id="friend-question">大学的第一个crush</h3>
+              <p>TA 抽到了这组三牌阵。作为老友，你来补一张加注牌，再选一句最像 TA 的预言。</p>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>TA 的牌阵</h2>
+              <span>起点 / 触发 / 走向</span>
+            </div>
+            <div class="tarot-spread friend-preview" id="friend-spread-preview">
+              <div class="tarot-card">
+                <span class="card-no">NO.07 起点</span>
+                <div class="card-art">书</div>
+                <h3>图书馆空位</h3>
+                <p>有人刚好坐在 TA 的日常旁边。</p>
+              </div>
+              <div class="tarot-card">
+                <span class="card-no">NO.14 触发</span>
+                <div class="card-art">伞</div>
+                <h3>雨天共伞</h3>
+                <p>天气替嘴硬的人制造借口。</p>
+              </div>
+              <div class="tarot-card">
+                <span class="card-no">NO.21 走向</span>
+                <div class="card-art">…</div>
+                <h3>没说出口的话</h3>
+                <p>关系开始变得不太普通。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="bonus-card-wrap">
+              <div class="tarot-card" id="friend-bonus-card">
+                <span class="card-no">老友加注</span>
+                <div class="card-art">?</div>
+                <h3>还没抽</h3>
+                <p>点一下，让老友视角进入牌阵。</p>
+              </div>
+              <div class="bonus-copy">
+                <strong>好友抽卡</strong>
+                <span>这张牌不改变命运，只负责揭穿 TA 很可能会嘴硬的部分。</span>
+                <button class="secondary-btn" id="friend-draw-btn">抽一张加注牌</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>老友预言</h2>
+              <span>选一句最像 TA 的</span>
+            </div>
+            <div class="option-list">
+              <button class="prophecy-option active">TA 会嘴上说“没有啊”，但聊天记录全招了。</button>
+              <button class="prophecy-option">我觉得 TA 会完全反着来，越说不可能越可能。</button>
+              <button class="prophecy-option">TA 会先装作普通同学，后来稳定出现在对方饭点。</button>
+            </div>
+          </section>
+
+          <section class="section">
+            <button class="primary-btn" id="complete-reading-btn">完成解读并返回</button>
+          </section>
+        </section>
+
+        <section class="screen" id="friend-screen">
+          <header class="topline">
+            <div class="brand">
+              <div class="logo">友</div>
+              <div class="brand-text">
+                <strong>好友剧情</strong>
+                <span>老友预言和平行大学</span>
+              </div>
+            </div>
+            <button class="icon-btn" aria-label="分享好友剧情">↗</button>
+          </header>
+
+          <section class="section">
+            <div class="story-card">
+              <div class="story-meta">
+                <div class="avatars">
+                  <span class="avatar-dot">我</span>
+                  <span class="avatar-dot">陈</span>
+                </div>
+                <span class="story-type">老友预言</span>
+              </div>
+              <h3>嘴硬但会上头</h3>
+              <p>
+                小陈认为你会在开学一个月内说“我只是随便认识一下”，然后稳定出现在某个人的饭点里。
+              </p>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="story-card">
+              <div class="story-meta">
+                <div class="avatars">
+                  <span class="avatar-dot">我</span>
+                  <span class="avatar-dot">林</span>
+                </div>
+                <span class="story-type">平行大学</span>
+              </div>
+              <h3>食堂盲盒共同体</h3>
+              <p>
+                如果你们被分到同一所大学，最可能在食堂二楼建立一个非常不健康但很稳定的饭局组织。
+              </p>
+              <div class="timeline">
+                <div class="timeline-item"><span class="dot"></span><span>食堂盲盒初遇</span></div>
+                <div class="timeline-item"><span class="dot"></span><span>宿舍群临时约饭</span></div>
+                <div class="timeline-item"><span class="dot"></span><span>四年固定饭点</span></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>邀请好友</h2>
+              <span>生成新剧情</span>
+            </div>
+            <div class="friend-actions">
+              <button class="primary-btn">老友预测我</button>
+              <button class="secondary-btn">如果我们同大学</button>
+            </div>
+          </section>
+        </section>
+
+        <nav class="bottom-nav" aria-label="底部导航">
+          <button class="nav-btn active" data-target="card-screen">
+            <span class="nav-icon">▣</span>
+            <span>我卡</span>
+          </button>
+          <button class="nav-btn" data-target="branch-screen">
+            <span class="nav-icon">⌘</span>
+            <span>支线</span>
+          </button>
+          <button class="nav-btn" data-target="friend-screen">
+            <span class="nav-icon">◇</span>
+            <span>好友剧情</span>
+          </button>
+        </nav>
+      </div>
+    </main>
+
+    <script>
+      const navButtons = document.querySelectorAll(".nav-btn");
+      const screens = document.querySelectorAll(".screen");
+      const options = document.querySelectorAll(".option");
+      const drawButton = document.querySelector("#draw-btn");
+      const oracleQuestion = document.querySelector("#oracle-question");
+      const tarotSpread = document.querySelector("#tarot-spread");
+      const oracleReading = document.querySelector("#oracle-reading");
+      const shareInterpretButton = document.querySelector("#share-interpret-btn");
+      const friendOracleScreen = document.querySelector("#friend-oracle-screen");
+      const backToBranchButton = document.querySelector("#back-to-branch-btn");
+      const friendQuestion = document.querySelector("#friend-question");
+      const friendSpreadPreview = document.querySelector("#friend-spread-preview");
+      const friendBonusCard = document.querySelector("#friend-bonus-card");
+      const friendDrawButton = document.querySelector("#friend-draw-btn");
+      const prophecyOptions = document.querySelectorAll(".prophecy-option");
+      const completeReadingButton = document.querySelector("#complete-reading-btn");
+      const cardScreen = document.querySelector("#card-screen");
+      const cardSubtitle = document.querySelector("#card-subtitle");
+      const cardId = document.querySelector("#card-id");
+      const personaTitle = document.querySelector("#persona-title");
+      const personaCopy = document.querySelector("#persona-copy");
+      const finishQuizButton = document.querySelector("#finish-quiz-btn");
+      const redoQuizButton = document.querySelector("#redo-quiz-btn");
+
+      const oracleCards = [
+        {
+          no: "NO.03",
+          icon: "饭",
+          title: "食堂盲盒",
+          line: "一顿随便吃点，可能会打开固定饭点。",
+          hint: "关系会从低成本的相处里慢慢长出来",
+        },
+        {
+          no: "NO.07",
+          icon: "书",
+          title: "图书馆空位",
+          line: "有人刚好坐在你的日常旁边。",
+          hint: "第一次注意到 TA，可能是在非常普通的位置",
+        },
+        {
+          no: "NO.11",
+          icon: "夜",
+          title: "操场夜风",
+          line: "说好走一圈，最后走了很久。",
+          hint: "真正变熟的瞬间，会发生在不急着回去的时候",
+        },
+        {
+          no: "NO.14",
+          icon: "伞",
+          title: "雨天共伞",
+          line: "天气会替嘴硬的人制造借口。",
+          hint: "暧昧感可能来自一次不太方便的同行",
+        },
+        {
+          no: "NO.18",
+          icon: "麦",
+          title: "跑调副歌",
+          line: "真诚比唱准更容易被记住。",
+          hint: "你会因为一点笨拙的表达被别人记住",
+        },
+        {
+          no: "NO.21",
+          icon: "…",
+          title: "没说出口的话",
+          line: "关系开始变得不太普通。",
+          hint: "最关键的部分可能不是发生了什么，而是谁先沉默了",
+        },
+        {
+          no: "NO.24",
+          icon: "牌",
+          title: "桌游反转",
+          line: "有人会在局里露出完全不同的一面。",
+          hint: "你会在轻松的游戏里看见一个人的隐藏人格",
+        },
+        {
+          no: "NO.27",
+          icon: "码",
+          title: "黑客松泡面",
+          line: "临时组队，也可能通宵结义。",
+          hint: "共同熬过一个混乱晚上，会比自我介绍更有效",
+        },
+      ];
+
+      const cardRoles = ["起点", "触发", "走向"];
+      let currentQuestion = "大学的第一个crush";
+      let currentCards = [oracleCards[1], oracleCards[3], oracleCards[5]];
+      let bonusCard = null;
+
+      function showScreen(screenId) {
+        screens.forEach((screen) => screen.classList.remove("active"));
+        document.querySelector(`#${screenId}`).classList.add("active");
+      }
+
+      function renderTarotCards(container, cards, copyMode = "self") {
+        container.innerHTML = cards
+          .map(
+            (card, index) => `
+              <div class="tarot-card">
+                <span class="card-no">${card.no} ${cardRoles[index]}</span>
+                <div class="card-art">${card.icon}</div>
+                <h3>${card.title}</h3>
+                <p>${copyMode === "friend" ? card.line.replace("你的", "TA 的") : card.line}</p>
+              </div>
+            `
+          )
+          .join("");
+      }
+
+      function renderBonusCard(card) {
+        friendBonusCard.innerHTML = `
+          <span class="card-no">${card.no} 老友加注</span>
+          <div class="card-art">${card.icon}</div>
+          <h3>${card.title}</h3>
+          <p>${card.line}</p>
+        `;
+      }
+
+      navButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          navButtons.forEach((item) => item.classList.remove("active"));
+          screens.forEach((screen) => screen.classList.remove("active"));
+          button.classList.add("active");
+          document.querySelector(`#${button.dataset.target}`).classList.add("active");
+        });
+      });
+
+      options.forEach((option) => {
+        option.addEventListener("click", () => {
+          options.forEach((item) => item.classList.remove("active"));
+          option.classList.add("active");
+        });
+      });
+
+      prophecyOptions.forEach((option) => {
+        option.addEventListener("click", () => {
+          prophecyOptions.forEach((item) => item.classList.remove("active"));
+          option.classList.add("active");
+        });
+      });
+
+      finishQuizButton.addEventListener("click", () => {
+        cardScreen.classList.add("is-completed");
+        cardSubtitle.textContent = "我的大学人格名片";
+        cardId.textContent = "DADA-ID FAN-0427";
+        personaTitle.textContent = "快乐乱入型主角";
+        personaCopy.textContent =
+          "你总能把普通校园日常玩成隐藏支线，熟起来以后非常容易把大家带进奇怪但快乐的计划。";
+      });
+
+      redoQuizButton.addEventListener("click", () => {
+        cardScreen.classList.remove("is-completed");
+        cardSubtitle.textContent = "先答题，再生成名片";
+        cardId.textContent = "DADA-ID 待生成";
+        personaTitle.textContent = "未知角色";
+        personaCopy.textContent =
+          "先回答几道校园选择题，哒哒大王会把你捏成一张可以分享给老友预言的大学人格名片。";
+      });
+
+      drawButton.addEventListener("click", () => {
+        const shuffled = [...oracleCards].sort(() => Math.random() - 0.5);
+        const selectedCards = shuffled.slice(0, 3);
+        const question =
+          oracleQuestion.value.trim() || "大学的第一个crush";
+        currentQuestion = question;
+        currentCards = selectedCards;
+
+        renderTarotCards(tarotSpread, selectedCards);
+
+        oracleReading.innerHTML = `
+          <h3>${question}</h3>
+          <p>
+            ${selectedCards[0].hint}，${selectedCards[1].hint}，最后${selectedCards[2].hint}。完整解读需要一位老友来加注，因为 TA 可能比你更知道你会怎么嘴硬。
+          </p>
+        `;
+      });
+
+      shareInterpretButton.addEventListener("click", () => {
+        currentQuestion = oracleQuestion.value.trim() || "大学的第一个crush";
+        friendQuestion.textContent = currentQuestion;
+        renderTarotCards(friendSpreadPreview, currentCards, "friend");
+        showScreen("friend-oracle-screen");
+      });
+
+      backToBranchButton.addEventListener("click", () => {
+        showScreen("branch-screen");
+      });
+
+      friendDrawButton.addEventListener("click", () => {
+        bonusCard = oracleCards[Math.floor(Math.random() * oracleCards.length)];
+        renderBonusCard(bonusCard);
+      });
+
+      completeReadingButton.addEventListener("click", () => {
+        if (!bonusCard) {
+          bonusCard = oracleCards[5];
+          renderBonusCard(bonusCard);
+        }
+
+        const prophecy =
+          document.querySelector(".prophecy-option.active")?.textContent ||
+          "TA 会嘴上说“没有啊”，但聊天记录全招了。";
+
+        oracleReading.classList.add("completed-reading");
+        oracleReading.innerHTML = `
+          <h3>老友已解读：${currentQuestion}</h3>
+          <p>
+            你的三张牌是「${currentCards.map((card) => card.title).join(" / ")}」。
+            老友加注抽到「${bonusCard.title}」，并预言：${prophecy}
+            这条支线现在从“可能发生”升级成“很像你会干出来的事”。
+          </p>
+        `;
+        shareInterpretButton.textContent = "继续发给好友抽取加注卡牌";
+        showScreen("branch-screen");
+      });
+    </script>
+  </body>
+</html>
