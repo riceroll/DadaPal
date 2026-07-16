@@ -5,6 +5,15 @@ type Feature = 'profile-card' | 'match' | 'cbti' | 'tarot' | 'compatibility' | '
 type Panel = Exclude<Feature, 'answer-book'> | null
 type Sender = 'dada' | 'user'
 
+type BetaConversation = {
+  id: string
+  title: string
+  subtitle: string
+  kind: 'dada' | 'group'
+  badge: '搭' | '群'
+  isNew?: boolean
+}
+
 type BetaMessage =
   | { id: string; kind: 'text'; sender: Sender; text: string }
   | { id: string; kind: 'feature'; feature: Feature }
@@ -71,6 +80,16 @@ const initialMessages: BetaMessage[] = [
   { id: 'beta-compatibility', kind: 'feature', feature: 'compatibility' },
   { id: 'beta-match', kind: 'feature', feature: 'match' },
 ]
+
+const recommendedGroup = {
+  id: 'group:campus-idea-lab',
+  title: '校园灵感搭子群',
+  subtitle: '推荐 · AI、项目与逛展',
+  messages: [
+    { id: 'group-welcome', kind: 'text' as const, sender: 'dada' as const, text: '欢迎来到校园灵感搭子群。哒哒已把你的找搭子方向带过来：先用一句话介绍最近想做的事，再看看谁也在同一条轨道上。' },
+    { id: 'group-prompt', kind: 'text' as const, sender: 'dada' as const, text: '破冰提示：你最近最想找人一起完成的一件小事是什么？' },
+  ],
+}
 
 const questions = [
   { question: '开学第一顿饭，你更像哪一种？', options: [['食堂盲盒启动，难吃也是体验', 'explore'], ['先查评分最高的店，第一口不能输', 'plan'], ['你们决定，我负责把大家聊熟', 'social']] },
@@ -163,8 +182,14 @@ function CampusProfileCard({ profile }: { profile: CampusProfile }) {
   return <article className="beta-campus-profile-card"><div className="beta-profile-card-top"><span className="beta-profile-mascot" aria-hidden="true"><i className="beta-profile-cap">⌂</i><i className="beta-profile-face">•ᴗ•</i><i className="beta-profile-body">✦</i></span><div><small>{profile.dadaId}</small><h3>{profile.nickname || '校园同学'}</h3><p>{identity || '校园坐标待补充'}</p></div></div><p className="beta-profile-card-focus">{profile.interests || '正在探索校园生活的更多可能'}</p>{hasCbti(profile) && <div className="beta-profile-card-sbti"><strong>{profile.sbtiCode}</strong><span>{profile.roleName}</span></div>}</article>
 }
 
+function ConversationRow({ item, active, onSelect }: { item: BetaConversation; active: boolean; onSelect: (id: string) => void }) {
+  return <button className={`beta-conversation ${active ? 'active' : ''}`} type="button" onClick={() => onSelect(item.id)}><span className={`beta-list-avatar ${item.kind === 'group' ? 'is-group' : ''}`}>{item.badge}</span><span className="beta-conversation-copy"><strong>{item.title}</strong><small>{item.subtitle}</small></span>{item.isNew && <em>NEW</em>}</button>
+}
+
 export function BetaApp() {
-  const [messages, setMessages] = useState<BetaMessage[]>(initialMessages)
+  const [conversations, setConversations] = useState<BetaConversation[]>([{ id: 'dada-main', title: 'AAA 哒哒大王 👑', subtitle: 'Beta · 校园全能好朋友', kind: 'dada', badge: '搭' }])
+  const [activeConversationId, setActiveConversationId] = useState('dada-main')
+  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, BetaMessage[]>>({ 'dada-main': initialMessages })
   const [draft, setDraft] = useState('')
   const [panel, setPanel] = useState<Panel>(null)
   const [profile, setProfile] = useState<CampusProfile | null>(loadProfile)
@@ -187,7 +212,17 @@ export function BetaApp() {
     }
   }
 
-  const append = (message: BetaMessage) => setMessages((current) => [...current, message])
+  const activeConversation = conversations.find((item) => item.id === activeConversationId) ?? conversations[0]
+  const messages = messagesByConversation[activeConversationId] ?? []
+  const isGroupConversation = activeConversation.kind === 'group'
+  const appendToConversation = (conversationId: string, message: BetaMessage) => setMessagesByConversation((current) => ({ ...current, [conversationId]: [...(current[conversationId] ?? []), message] }))
+  const appendToDada = (message: BetaMessage) => appendToConversation('dada-main', message)
+
+  const recommendGroup = () => {
+    setConversations((current) => current.some((item) => item.id === recommendedGroup.id) ? current : [...current, { id: recommendedGroup.id, title: recommendedGroup.title, subtitle: recommendedGroup.subtitle, kind: 'group', badge: '群', isNew: true }])
+    setMessagesByConversation((current) => current[recommendedGroup.id] ? current : { ...current, [recommendedGroup.id]: recommendedGroup.messages })
+    appendToDada({ id: crypto.randomUUID(), kind: 'text', sender: 'dada', text: '我给你推了一个「校园灵感搭子群」，已经出现在左侧聊天列表。里面有一条专属破冰提示，去看看吧。' })
+  }
 
   const openFeature = (feature: Feature) => {
     if (feature === 'answer-book') return
@@ -197,16 +232,16 @@ export function BetaApp() {
   const sendMessage = () => {
     const text = draft.trim()
     if (!text) return
-    append({ id: crypto.randomUUID(), kind: 'text', sender: 'user', text })
+    appendToConversation(activeConversationId, { id: crypto.randomUUID(), kind: 'text', sender: 'user', text })
     setDraft('')
-    append({ id: crypto.randomUUID(), kind: 'text', sender: 'dada', text: '我收到啦。这个 Beta 先把几个能力做成入口卡，你可以直接点一张开始玩；下一轮会接上模型，让我根据你这句话自然带你去对应功能。' })
+    appendToConversation(activeConversationId, { id: crypto.randomUUID(), kind: 'text', sender: 'dada', text: '我收到啦。这个 Beta 先把几个能力做成入口卡，你可以直接点一张开始玩；下一轮会接上模型，让我根据你这句话自然带你去对应功能。' })
   }
 
   const saveProgress = (nextProfile: CampusProfile, reply: string) => {
     setProfile(nextProfile)
     saveProfile(nextProfile)
     setPanel(null)
-    append({ id: crypto.randomUUID(), kind: 'text', sender: 'dada', text: reply })
+    appendToDada({ id: crypto.randomUUID(), kind: 'text', sender: 'dada', text: reply })
   }
 
   const onCbtiReady = (persona: Pick<CampusProfile, 'sbtiCode' | 'roleName' | 'tags'>) => {
@@ -221,35 +256,41 @@ export function BetaApp() {
     saveProgress(nextProfile, hasCbti(nextProfile)
       ? `你的校园名片已生成，DADA-ID 是 ${nextProfile.dadaId}。现在可以去测好友契合度，或开始找搭子。`
       : `你的校园名片已生成，DADA-ID 是 ${nextProfile.dadaId}。校园 CBTI 与好友契合度现在都已解锁。`)
-    append({ id: crypto.randomUUID(), kind: 'profile-card', profile: nextProfile })
+    appendToDada({ id: crypto.randomUUID(), kind: 'profile-card', profile: nextProfile })
   }
 
   return (
     <main className="beta-shell">
+      <aside className="beta-conversation-list" aria-label="聊天列表">
+        <div className="beta-list-heading"><span className="beta-list-brand">搭</span><div><strong>DadaPal Beta</strong><small>校园全能好朋友</small></div></div>
+        <p className="beta-list-section">聊天</p>
+        {conversations.filter((item) => item.kind === 'dada').map((item) => <ConversationRow key={item.id} item={item} active={item.id === activeConversationId} onSelect={setActiveConversationId} />)}
+        {conversations.some((item) => item.kind === 'group') && <><p className="beta-list-section">找搭子推荐群</p>{conversations.filter((item) => item.kind === 'group').map((item) => <ConversationRow key={item.id} item={item} active={item.id === activeConversationId} onSelect={setActiveConversationId} />)}</>}
+      </aside>
       <section className="beta-phone" aria-label="DadaPal Beta 聊天">
         <div className="beta-statusbar" aria-hidden="true">
           <span>9:41</span>
           <span className="beta-status-icons">▮▮▮ 5G ▰</span>
         </div>
-        <header className="beta-header"><div className="beta-header-title"><span className="beta-avatar">搭</span><div><strong>AAA 哒哒大王 👑</strong><small>Beta · 校园全能好朋友</small></div></div><span className="beta-live">测试中</span></header>
+        <header className="beta-header"><div className="beta-header-title"><span className="beta-avatar">{activeConversation.badge}</span><div><strong>{activeConversation.title}</strong><small>{activeConversation.subtitle}</small></div></div>{!isGroupConversation && <span className="beta-live">测试中</span>}</header>
         <div className="beta-feed">
           <p className="beta-time">DadaPal Beta 内测</p>
           {messages.map((message) => message.kind === 'text' ? (
             <div className={`beta-message ${message.sender}`} key={message.id}>
-              {message.sender === 'dada' && <span className="beta-avatar">搭</span>}
+              {message.sender === 'dada' && <span className="beta-avatar">{activeConversation.badge}</span>}
               <p>{message.text}</p>
             </div>
           ) : message.kind === 'feature' ? <div className="beta-card-row" key={message.id}><span className="beta-avatar">搭</span><FeatureCard feature={message.feature} profile={profile} onOpen={openFeature} /></div> : message.kind === 'profile-card' ? <div className="beta-card-row" key={message.id}><span className="beta-avatar">搭</span><CampusProfileCard profile={message.profile} /></div> : <div className="beta-card-row" key={message.id}><span className="beta-avatar">搭</span><TarotChatCard cards={message.cards} interpretation={message.interpretation} /></div>)}
         </div>
-        <form className="beta-composer" onSubmit={(event) => { event.preventDefault(); sendMessage() }}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="说说你现在想做什么…" /><button type="submit">发送</button></form>
+        <form className="beta-composer" onSubmit={(event) => { event.preventDefault(); sendMessage() }}><input value={draft} disabled={isGroupConversation} onChange={(event) => setDraft(event.target.value)} placeholder={isGroupConversation ? '推荐群暂不支持发言' : '说说你现在想做什么…'} /><button type="submit" disabled={isGroupConversation}>发送</button></form>
         <div className="beta-home-indicator" aria-hidden="true" />
       </section>
 
       {panel === 'profile-card' && <ProfileCardPanel profile={profile} onClose={() => setPanel(null)} onNavigate={setPanel} onComplete={onProfileReady} />}
       {panel === 'cbti' && <CbtiPanel existingProfile={profile} onClose={() => setPanel(null)} onNavigate={setPanel} onComplete={onCbtiReady} />}
-      {panel === 'tarot' && <TarotPanel apiKey={aiKey} profile={profile} onClose={() => setPanel(null)} onNavigate={setPanel} onComplete={(cards, interpretation) => { append({ id: crypto.randomUUID(), kind: 'tarot-reading', cards, interpretation }); setPanel(null) }} />}
+      {panel === 'tarot' && <TarotPanel apiKey={aiKey} profile={profile} onClose={() => setPanel(null)} onNavigate={setPanel} onComplete={(cards, interpretation) => { appendToDada({ id: crypto.randomUUID(), kind: 'tarot-reading', cards, interpretation }); setPanel(null) }} />}
       {panel === 'compatibility' && <CompatibilityPanel apiKey={aiKey} profile={profile} onClose={() => setPanel(null)} onOpenFeature={setPanel} />}
-      {panel === 'match' && <MatchPanel apiKey={aiKey} profile={profile} onClose={() => setPanel(null)} onOpenFeature={setPanel} />}
+      {panel === 'match' && <MatchPanel apiKey={aiKey} profile={profile} onClose={() => setPanel(null)} onOpenFeature={setPanel} onRecommendGroup={recommendGroup} />}
       {!aiKey && <div className="ai-unlock-overlay" role="dialog" aria-modal="true" aria-label="解锁 AI 功能"><section className="ai-unlock-card"><span className="ai-unlock-mark">搭</span><h1>解锁哒哒 AI</h1><p>输入访问密码后，可使用实时搭罗解读与找搭子引导。密钥只保留在本次页面内存中。</p><form onSubmit={(event) => { event.preventDefault(); void unlockAi() }}><input type="password" autoFocus value={unlockPassword} onChange={(event) => setUnlockPassword(event.target.value)} placeholder="访问密码" /><button type="submit" disabled={isUnlocking}>{isUnlocking ? '正在解锁…' : '解锁并开始'}</button></form>{unlockError && <small>{unlockError}</small>}</section></div>}
     </main>
   )
@@ -347,11 +388,12 @@ function TarotChatCard({ cards, interpretation }: { cards: DrawnTarotCard[]; int
   return <article className="beta-tarot-chat-card"><strong>你的三张搭罗牌</strong><div>{cards.map((card, index) => <TarotCardFace key={`${card.title}-${index}`} card={card} />)}</div><p>{interpretation}</p></article>
 }
 
-function MatchPanel({ apiKey, profile, onClose, onOpenFeature }: { apiKey: string | null; profile: CampusProfile | null; onClose: () => void; onOpenFeature: (feature: Panel) => void }) {
+function MatchPanel({ apiKey, profile, onClose, onOpenFeature, onRecommendGroup }: { apiKey: string | null; profile: CampusProfile | null; onClose: () => void; onOpenFeature: (feature: Panel) => void; onRecommendGroup: () => void }) {
   const [messages, setMessages] = useState<{ sender: Sender; text: string }[]>([{ sender: 'dada', text: '嗨，我是哒哒大王。说说你现在在做什么，以及想找怎样的搭子？比如「周六想练网球，想找一个愿意一起从零开始的人」。' }])
   const [draft, setDraft] = useState('')
   const [quickReplies, setQuickReplies] = useState<string[]>([])
   const [isThinking, setIsThinking] = useState(false)
+  const [canRecommendGroup, setCanRecommendGroup] = useState(false)
 
   const send = async (quickReply?: string) => {
     if (isThinking) return
@@ -360,13 +402,15 @@ function MatchPanel({ apiKey, profile, onClose, onOpenFeature }: { apiKey: strin
     setMessages((current) => [...current, { sender: 'user', text }])
     setDraft('')
     setQuickReplies([])
+    setCanRecommendGroup(false)
     setIsThinking(true)
     try {
       if (!apiKey) throw new Error('AI is locked')
       const history = [...messages, { sender: 'user' as Sender, text }].slice(-8).map((message) => `${message.sender === 'dada' ? '哒哒' : '用户'}：${message.text}`).join('\n')
-      const reply = await askOpenRouter<{ reply: string; quickReplies: string[] }>(apiKey, `你是 AAA 哒哒大王，一个微信语气、温柔且主动的校园找搭子助手。根据聊天记录帮用户把活动、时间、地点、想遇见的人说清楚。先接住已知信息，再自然追问至多一个最有助匹配的缺失细节；信息足够时总结筛选条件并说明会据此匹配。不要编造真实同学或保证匹配成功。严格输出 JSON：reply（20-80字中文），quickReplies（0-3个短中文回复）。\n用户档案：${profile ? `${profile.school} ${profile.college} ${profile.grade} ${profile.major}；兴趣：${profile.interests}；CBTI：${profile.roleName}` : '未填写'}\n聊天记录：\n${history}`, 350)
+      const reply = await askOpenRouter<{ reply: string; quickReplies: string[]; readyToRecommend?: boolean }>(apiKey, `你是 AAA 哒哒大王，一个微信语气、温柔且主动的校园找搭子助手。根据聊天记录帮用户把活动、时间、地点、想遇见的人说清楚。先接住已知信息，再自然追问至多一个最有助匹配的缺失细节；信息足够时总结筛选条件并说明会据此匹配。不要编造真实同学或保证匹配成功。严格输出 JSON：reply（20-80字中文），quickReplies（0-3个短中文回复），readyToRecommend（布尔值；活动和对象偏好已清楚时为 true）。\n用户档案：${profile ? `${profile.school} ${profile.college} ${profile.grade} ${profile.major}；兴趣：${profile.interests}；CBTI：${profile.roleName}` : '未填写'}\n聊天记录：\n${history}`, 350)
       setMessages((current) => [...current, { sender: 'dada', text: reply.reply }])
       setQuickReplies(Array.isArray(reply.quickReplies) ? reply.quickReplies.slice(0, 3) : [])
+      setCanRecommendGroup(reply.readyToRecommend === true)
     } catch {
       setMessages((current) => [...current, { sender: 'dada', text: '我这边刚刚没连上匹配助手。你可以再发一次，我会继续记住你刚才说的方向。' }])
     } finally {
@@ -374,7 +418,7 @@ function MatchPanel({ apiKey, profile, onClose, onOpenFeature }: { apiKey: strin
     }
   }
   if (!hasProfileCard(profile) || !hasCbti(profile)) return <Modal title="找个搭子" subtitle="完成搭搭卡和校园 CBTI 后，哒哒才能按你的校园坐标和社交偏好认真找搭子。" profile={profile} onClose={onClose} onNavigate={onOpenFeature}><section className="beta-empty"><span>⌁</span><h2>{hasProfileCard(profile) ? '先完成校园 CBTI' : '先完成搭搭卡和 CBTI'}</h2><p>{hasProfileCard(profile) ? '完成社交偏好测试后，找搭子会更贴近你。' : '校园坐标和社交偏好是找搭子的基础。'}</p><button className="beta-primary" type="button" onClick={() => onOpenFeature(hasProfileCard(profile) ? 'cbti' : 'profile-card')}>{hasProfileCard(profile) ? '去做校园 CBTI' : '填写我的校园名片'}</button></section></Modal>
-  return <Modal title="找个搭子" subtitle="像和哒哒大王聊天一样，慢慢说清楚这次想一起做什么。" profile={profile} onClose={onClose} onNavigate={onOpenFeature}><section className="mini-match-chat"><div className="mini-match-thread">{messages.map((message, index) => <div className={`mini-match-message ${message.sender}`} key={`${message.text}-${index}`}>{message.sender === 'dada' && <span className="beta-avatar">搭</span>}<p>{message.text}</p></div>)}{isThinking && <div className="mini-match-message dada mini-match-thinking"><span className="beta-avatar">搭</span><p>哒哒正在想怎么帮你把这次搭子说清楚…</p></div>}</div>{quickReplies.length > 0 && <div className="mini-match-actions">{quickReplies.map((reply) => <button key={reply} type="button" onClick={() => void send(reply)}>{reply}</button>)}</div>}<form className="mini-match-composer" onSubmit={(event) => { event.preventDefault(); void send() }}><input value={draft} disabled={isThinking} onChange={(event) => setDraft(event.target.value)} placeholder="说说时间、地点、活动或你想遇见的人…" /><button type="submit" disabled={isThinking}>发送</button></form></section></Modal>
+  return <Modal title="找个搭子" subtitle="像和哒哒大王聊天一样，慢慢说清楚这次想一起做什么。" profile={profile} onClose={onClose} onNavigate={onOpenFeature}><section className="mini-match-chat"><div className="mini-match-thread">{messages.map((message, index) => <div className={`mini-match-message ${message.sender}`} key={`${message.text}-${index}`}>{message.sender === 'dada' && <span className="beta-avatar">搭</span>}<p>{message.text}</p></div>)}{isThinking && <div className="mini-match-message dada mini-match-thinking"><span className="beta-avatar">搭</span><p>哒哒正在想怎么帮你把这次搭子说清楚…</p></div>}</div>{canRecommendGroup && <button className="beta-primary" type="button" onClick={() => { onRecommendGroup(); onClose() }}>推送推荐搭子群</button>}{quickReplies.length > 0 && <div className="mini-match-actions">{quickReplies.map((reply) => <button key={reply} type="button" onClick={() => void send(reply)}>{reply}</button>)}</div>}<form className="mini-match-composer" onSubmit={(event) => { event.preventDefault(); void send() }}><input value={draft} disabled={isThinking} onChange={(event) => setDraft(event.target.value)} placeholder="说说时间、地点、活动或你想遇见的人…" /><button type="submit" disabled={isThinking}>发送</button></form></section></Modal>
 }
 
 function CompatibilityPanel({ apiKey, profile, onClose, onOpenFeature }: { apiKey: string | null; profile: CampusProfile | null; onClose: () => void; onOpenFeature: (feature: Panel) => void }) {
