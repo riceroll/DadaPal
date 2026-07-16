@@ -166,8 +166,8 @@ export function BetaApp() {
   return (
     <main className="beta-shell">
       <aside className="beta-side">
-        <a className="beta-back" href="../">← 返回 DadaPal 主版</a>
-        <div className="beta-logo"><span>搭</span><div><strong>Dada Beta</strong><small>校园全能好朋友</small></div></div>
+        <a className="beta-back" href="/DadaPal/">← 返回 DadaPal 主版</a>
+        <div className="beta-logo"><span>搭</span><div><strong>Dada Beta</strong><small>校园贴纸手账风 · 全能好朋友</small></div></div>
         <p>找搭子仍是主线；人格、塔罗和好友玩法，让认识彼此更有意思。</p>
         <div className="beta-menu">
           {(Object.keys(featureCopy) as Feature[]).filter((feature) => feature !== 'answer-book').map((feature) => (
@@ -178,17 +178,22 @@ export function BetaApp() {
       </aside>
 
       <section className="beta-phone" aria-label="DadaPal Beta 聊天">
+        <div className="beta-statusbar" aria-hidden="true">
+          <span>9:41</span>
+          <span className="beta-status-icons">▮▮▮ 5G ▰</span>
+        </div>
         <header className="beta-header"><div><strong>AAA 哒哒大王 👑</strong><small>Beta · 校园全能好朋友</small></div><span className="beta-live">测试中</span></header>
         <div className="beta-feed">
           <p className="beta-time">DadaPal Beta 内测</p>
           {messages.map((message) => message.kind === 'text' ? (
             <div className={`beta-message ${message.sender}`} key={message.id}>
-              {message.sender === 'dada' && <span className="beta-avatar">A</span>}
+              {message.sender === 'dada' && <span className="beta-avatar">搭</span>}
               <p>{message.text}</p>
             </div>
-          ) : <div className="beta-card-row" key={message.id}><span className="beta-avatar">A</span><FeatureCard feature={message.feature} onOpen={openFeature} /></div>)}
+          ) : <div className="beta-card-row" key={message.id}><span className="beta-avatar">搭</span><FeatureCard feature={message.feature} onOpen={openFeature} /></div>)}
         </div>
         <form className="beta-composer" onSubmit={(event) => { event.preventDefault(); sendMessage() }}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="说说你现在想做什么…" /><button type="submit">发送</button></form>
+        <div className="beta-home-indicator" aria-hidden="true" />
       </section>
 
       {panel === 'sbti' && <SbtiPanel existingProfile={profile} onClose={() => setPanel(null)} onComplete={onProfileReady} />}
