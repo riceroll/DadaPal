@@ -1,3 +1,20 @@
+# DadaPal Web
+
+## Static AI mode for GitHub Pages
+
+The Beta page can run its AI features without a deployed API. The committed
+`src/ai-key.encrypted.json` file contains only an AES-GCM encrypted OpenRouter
+key. Visitors must enter the shared access password each time they open the
+page; the decrypted key stays in page memory only.
+
+To rotate the OpenRouter key or access password locally, generate a new bundle
+before building. Do not commit `.env` or the raw key.
+
+```sh
+OPENROUTER_API_KEY='...' DADAPAL_ACCESS_PASSWORD='...' npm run encrypt-ai-key
+```
+
+Then run `npm run build` and deploy the static `dist` output.
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.

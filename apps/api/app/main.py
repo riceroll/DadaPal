@@ -1,3 +1,6 @@
+import json
+
+import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select
@@ -19,6 +22,8 @@ from app.schemas import (
     ProfileExtractResponse,
     SessionCreate,
     SessionRead,
+    TarotInterpretRequest,
+    TarotInterpretResponse,
 )
 
 settings = get_settings()
@@ -144,6 +149,37 @@ def extract_profile(payload: ProfileExtractRequest) -> ProfileExtractResponse:
         natural_summary=result.natural_summary,
         assistant_reply=result.assistant_reply,
     )
+
+
+@app.post("/tarot/interpret", response_model=TarotInterpretResponse)
+def interpret_tarot(payload: TarotInterpretRequest) -> TarotInterpretResponse:
+    cards = "；".join(f"{card.title}（{'逆位' if card.reversed else '正位'}）：{card.line}" for card in payload.cards)
+    fallback = TarotInterpretResponse(
+        surface=f"**牌面元素**：{cards}。三张牌把食堂、校门、宿舍、图书馆或操场这些校园日常意象放进同一张桌布上。它们不是抽象符号，而是提醒你看见真实的节奏：谁愿意停下来一起吃饭，谁在路过时多说了一句，谁把原本普通的并肩变成了可以继续的话题。表层上，这是一组关于相遇、回应与轻松靠近的牌。",
+        depth="**深层关系**：你问的并不只是结果，而是自己有没有勇气把心里的好奇交给现实检验。牌面建议你保留一点**不急着定义**的空间：不用先判断这是不是命定关系，也不必用一次互动证明全部可能。真正值得观察的，是对方是否会持续、自然地把回应还给你。",
+        structure="**组合结构**：第一张牌铺开你当前所处的情绪与环境，第二张牌像一扇正在打开的门，指出最容易发生连接的触发点；第三张牌则把故事落回一个具体动作。这三张牌不是线性的预言，而是一个由感受、邀请到反馈组成的**小循环**，让你可以在校园生活里慢慢验证。",
+        guidance="**指引**：接下来一周，挑一个低压力但可被回应的行动：问一句“要不要一起吃饭”、约一次课后散步，或在共同任务里递出一个具体的小邀请。预测不在于某个人一定会出现，而在于当你不再把主动当成冒险，关系更可能从一次真实、轻盈的互动里自然长出来。",
+    )
+    if not settings.openrouter_api_key:
+        return fallback
+    prompt = (
+        "你是一位专业、温柔但不作确定预言的校园塔罗解读师。根据问题和三张牌，输出 JSON 对象，严格只有 surface、depth、structure、guidance 四个中文字符串字段。"
+        "四段总计不少于 850 个中文字符，每段 180-260 字；用 **关键词** 做 1-2 处加粗；第一段逐张解释元素与表层含义，第二段联系提问做深层分析，"
+        "第三段解释三张牌的结构关系，第四段给出具体、低风险的预测或行动指引。避免医疗、财务、绝对化结论。"
+        f"\n问题：{payload.question}\n牌：{cards}"
+    )
+    try:
+        with httpx.Client(timeout=20.0) as client:
+            response = client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.openrouter_api_key}", "Content-Type": "application/json"},
+                json={"model": settings.openrouter_model, "messages": [{"role": "user", "content": prompt}], "response_format": {"type": "json_object"}, "max_tokens": 1400, "reasoning": {"effort": "none"}},
+            )
+            response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"]
+        return TarotInterpretResponse.model_validate(json.loads(content))
+    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError):
+        return fallback
 
 
 @app.post("/onboarding/answers")

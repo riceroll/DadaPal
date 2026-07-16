@@ -101,3 +101,21 @@ class GroupInvite(BaseModel):
     title: str
     description: str
     qr_code_url: str
+
+
+class TarotCardInput(BaseModel):
+    title: str
+    reversed: bool = False
+    line: str
+
+
+class TarotInterpretRequest(BaseModel):
+    question: str
+    cards: list[TarotCardInput] = Field(min_length=3, max_length=3)
+
+
+class TarotInterpretResponse(BaseModel):
+    surface: str
+    depth: str
+    structure: str
+    guidance: str

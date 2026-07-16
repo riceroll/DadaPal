@@ -129,16 +129,22 @@ const introMessage = `嗨嗨～我是 ${BOT_NAME} 👑
 
 简单来说，你告诉我一点关于你的情况，我会先帮你整理一张个人资料卡，再去帮你找合适的人和群。`
 
-const introQuestion = `先从你开始吧。
+const introQuestion = `先从你开始吧 ✦
 
-你可以随便说说：你是谁、最近在忙什么、想认识什么样的人。
+你可以随便告诉我三件事：
+• 你是谁 / 在哪里上学
+• 最近在忙什么
+• 想认识什么样的人
 
-比如你可以这样说：
-1. 我是交大大二，最近在做 AI + 设计项目，想认识一起做作品集的小伙伴
-2. 我是复旦新生，刚来上海，想找周末一起探索城市的搭子
-3. 我是同济研一，想认识对创业和产品感兴趣的同学
+可以直接照着这样发：
 
-如果你现在懒得写，也可以直接回我：跳过`
+① 交大大二，最近做 AI + 设计项目，想找一起做作品集的小伙伴
+
+② 复旦新生，刚来上海，想找周末一起探索城市的搭子
+
+③ 同济研一，想认识对创业和产品感兴趣的同学
+
+不想写也没关系，直接回复「跳过」就好。`
 
 const initialMessages: ChatItem[] = [
   {
@@ -198,6 +204,7 @@ function App() {
     },
   ])
   const [activeConversationId, setActiveConversationId] = useState('bot-main')
+  const [showConversationList, setShowConversationList] = useState(false)
   const [profileForm, setProfileForm] = useState<UserProfile>({
     nickname: '',
     identity: '',
@@ -537,19 +544,22 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${showConversationList ? 'show-conversation-list' : ''}`}>
       <aside className="chat-list" aria-label="DadaPal conversations">
         <div className="profile-row">
-          <strong>对话列表</strong>
+          <strong>微信</strong>
         </div>
         {conversations.map((item) => (
           <button
             key={item.id}
             className={`conversation ${item.id === activeConversationId ? 'active' : ''}`}
             type="button"
-            onClick={() => setActiveConversationId(item.id)}
+            onClick={() => {
+              setActiveConversationId(item.id)
+              setShowConversationList(false)
+            }}
           >
-            <span className={`bot-dot ${item.badge === '群' ? 'muted' : ''}`}>{item.badge}</span>
+            <span className={`bot-dot ${item.badge === '群' ? 'muted' : ''}`}>{item.badge === '群' ? '群' : '搭'}</span>
             <span>
               <strong>{item.title}</strong>
               <small>{item.subtitle}</small>
@@ -559,9 +569,17 @@ function App() {
       </aside>
 
       <section className="phone-frame" aria-label="Fake WeChat chat">
+        <div className="main-statusbar" aria-hidden="true">
+          <span>9:41</span>
+          <span>▮▮▮ 5G ▰</span>
+        </div>
         <header className="chat-header">
-          <span>{activeConversation?.title ?? BOT_NAME}</span>
-          <small>{inGroupConversation ? '微信群聊' : '微信对话'}</small>
+          <div className="main-header-title">
+            <button className="conversation-back" type="button" onClick={() => setShowConversationList(true)} aria-label="返回对话列表">‹</button>
+            <span className={`mini-avatar ${inGroupConversation ? 'group-avatar' : ''}`}>{inGroupConversation ? '群' : '搭'}</span>
+            <div><strong>{activeConversation?.title ?? BOT_NAME}</strong><small>{inGroupConversation ? '微信群聊' : '微信对话'}</small></div>
+          </div>
+          {!inGroupConversation && <span className="main-live">在线</span>}
         </header>
 
         <div className="message-feed">
@@ -597,7 +615,7 @@ function App() {
             if (message.kind === 'typing') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">A</div>
+                  <div className="mini-avatar">搭</div>
                   <div className="typing-bubble" aria-label="输入中">
                     <span />
                     <span />
@@ -610,7 +628,7 @@ function App() {
             if (message.kind === 'miniProgram') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">A</div>
+                  <div className="mini-avatar">搭</div>
                   <div className="program-card">
                     <strong>{message.title}</strong>
                     <p>{message.subtitle}</p>
@@ -625,7 +643,7 @@ function App() {
             if (message.kind === 'groupInvite') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">A</div>
+                  <div className="mini-avatar">搭</div>
                   <div className="group-card">
                     <strong>{message.groupName}</strong>
                     <p>{message.description}</p>
@@ -638,7 +656,7 @@ function App() {
             if (message.kind === 'profileCard') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">A</div>
+                  <div className="mini-avatar">搭</div>
                   <article className="profile-card">
                     <img alt="用户头像" src={message.profile.avatarUrl || DEFAULT_AVATAR} />
                     <div>
@@ -661,7 +679,7 @@ function App() {
             if (message.kind === 'candidateCard') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">A</div>
+                  <div className="mini-avatar">搭</div>
                   <article className="profile-card candidate-card">
                     <img alt="候选同学头像" src={message.candidate.avatarUrl || CANDIDATE_AVATAR} />
                     <div>
@@ -683,7 +701,7 @@ function App() {
 
             return (
               <div className={`message-row ${message.sender}`} key={message.id}>
-                {message.sender === 'bot' ? <div className="mini-avatar">A</div> : null}
+                {message.sender === 'bot' ? <div className="mini-avatar">搭</div> : null}
                 <p className="bubble">{message.text}</p>
                 {message.sender === 'user' ? <img className="user-avatar" alt="你的头像" src={userAvatar} /> : null}
               </div>
@@ -707,6 +725,7 @@ function App() {
           />
           <button type="submit" disabled={isSending || inGroupConversation}>{isSending ? '发送中' : '发送'}</button>
         </form>
+        <div className="main-home-indicator" aria-hidden="true" />
       </section>
 
       {showQuestionnaire && (
