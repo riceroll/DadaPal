@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 import { askOpenRouter, unlockOpenRouterKey } from './aiAccess'
@@ -119,9 +119,11 @@ type ConversationItem = {
   badge: '企' | '群'
 }
 
-const DEFAULT_AVATAR = 'https://api.dicebear.com/9.x/thumbs/svg?seed=dadapal-user'
+const AVATAR_BASE = `${import.meta.env.BASE_URL}avatars/`
+const DEFAULT_AVATAR = `${AVATAR_BASE}user-default.svg`
 const BOT_NAME = 'AAA哒哒大王👑'
-const CANDIDATE_AVATAR = 'https://api.dicebear.com/9.x/thumbs/svg?seed=dadapal-match'
+const BOT_AVATAR = `${AVATAR_BASE}dada-king.svg`
+const CANDIDATE_AVATAR = `${AVATAR_BASE}match-default.svg`
 
 const introMessage = `嗨嗨～我是 ${BOT_NAME} 👑
 
@@ -162,29 +164,45 @@ const initialMessages: ChatItem[] = [
   },
 ]
 
-const firstGroupWelcomeMessages: ChatItem[] = [
-  {
-    kind: 'text',
-    id: 'group-tip-1',
-    sender: 'bot',
-    text: '欢迎来到沪上校园生存指南群！你可以在这里问选课、社团、活动和住宿问题。',
-  },
-  {
-    kind: 'text',
-    id: 'group-tip-2',
-    sender: 'bot',
-    text: '今天群里比较热的是：交大机器人大赛组队、复旦城市散步局、同济设计工作坊。',
-  },
-]
+function buildGroupName(profile: UserProfile, followUp: boolean) {
+  const focus = (profile.currentFocus || profile.seeking || '校园同频').replace(/[，。；;！!？?].*$/, '').slice(0, 12)
+  return followUp ? `${focus} 深聊组队群` : `${focus} 搭子交流组`
+}
 
-const secondGroupWelcomeMessages: ChatItem[] = [
-  {
-    kind: 'text',
-    id: 'second-group-tip-1',
-    sender: 'bot',
-    text: '欢迎来到沪上跨校项目组队群！这里主要是交大/复旦/同济跨校组队，适合找队友做比赛和项目。',
-  },
-]
+function buildCandidateFromProfile(profile: UserProfile): CandidateProfile {
+  const focus = profile.currentFocus || profile.seeking || '校园项目与兴趣探索'
+  const school = profile.identity.includes('复旦') ? '同济大学' : profile.identity.includes('同济') ? '复旦大学' : '同济大学'
+  const identityParts = profile.identity.split('·').map((part) => part.trim())
+  return {
+    name: '林知夏',
+    school,
+    studentId: 'DADA-LX21',
+    major: identityParts.find((part) => part && !isKnownSchool(part) && !/大[一二三四]|研[一二三]|新生/.test(part)) || '交互设计',
+    grade: profile.identity.match(/大[一二三四]|研[一二三]|新生/)?.[0] || '大三',
+    focus: `${focus} · 想找能一起启动的小伙伴`,
+    bio: `最近也在关注「${focus}」，更喜欢从一次轻松的讨论或小任务开始，看看能不能一起做下去。`,
+    tags: ['同频方向', '跨校连接', '愿意行动'],
+    avatarUrl: CANDIDATE_AVATAR,
+  }
+}
+
+function buildGroupIcebreaker(profile: UserProfile, candidate: CandidateProfile) {
+  const sharedFocus = profile.currentFocus || profile.seeking || candidate.focus.replace(/·.*$/, '').trim() || '校园里的新想法'
+  const userSchool = profile.identity.split('·').map((part) => part.trim()).find(isKnownSchool) || '你的学校'
+  const schoolConnection = userSchool === candidate.school ? `你们都在${userSchool}` : `你在${userSchool}，${candidate.name}在${candidate.school}`
+
+  return `破冰一下 👋\n\n你们的共同点：都在关注「${sharedFocus}」，而且都更愿意从一个小行动开始看看能不能做下去。${schoolConnection}，跨校交流也许能带来不同视角。\n\n给你们的破冰题：如果这周只留出 90 分钟来推进「${sharedFocus}」，你最想先做哪一件具体的小事？请两个人各自回答一下吧～`
+}
+
+function nextProfileRefinementQuestion(profile: UserProfile, refinementTurn: number) {
+  if (!profile.city) return '最后补一个小坐标：你现在主要在上海哪个校区或区域活动？这样我给你找活动和搭子会更顺路。'
+  if (refinementTurn === 0) return `为了把匹配再收准一点：做「${profile.currentFocus || '这件事'}」时，你更希望认识哪种搭子？比如能一起做项目、互相督促，还是交流经验的人？`
+  return '再问一个轻量问题：你平时比较方便的时间是什么时候？例如工作日晚上、周末下午，或线上也可以。'
+}
+
+function sanitizeWeChatText(text: string) {
+  return text.replace(/\*\*/g, '')
+}
 
 function App() {
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ChatItem[]>>({
@@ -195,6 +213,7 @@ function App() {
   const [flowStage, setFlowStage] = useState<FlowStage>('collectingProfile')
   const [showQuestionnaire, setShowQuestionnaire] = useState(false)
   const [profileTurns, setProfileTurns] = useState(0)
+  const [profileRefinementTurns, setProfileRefinementTurns] = useState(0)
   const [profileSnippets, setProfileSnippets] = useState<string[]>([])
   const [conversations, setConversations] = useState<ConversationItem[]>([
     {
@@ -219,6 +238,8 @@ function App() {
   const [unlockPassword, setUnlockPassword] = useState('')
   const [unlockError, setUnlockError] = useState('')
   const [isUnlocking, setIsUnlocking] = useState(false)
+  const messageFeedRef = useRef<HTMLDivElement>(null)
+  const candidateShownRef = useRef(false)
 
   const userAvatar = useMemo(() => {
     return profileForm.avatarUrl || DEFAULT_AVATAR
@@ -232,6 +253,11 @@ function App() {
   const inGroupConversation = activeConversation?.badge === '群'
 
   const messages = messagesByConversation[activeConversationId] ?? []
+  const isBotTyping = !inGroupConversation && (isSending || messages.some((message) => message.kind === 'typing'))
+
+  useEffect(() => {
+    messageFeedRef.current?.scrollTo({ top: messageFeedRef.current.scrollHeight, behavior: 'smooth' })
+  }, [activeConversationId, messages.length])
 
   const appendMessages = (conversationId: string, updater: (current: ChatItem[]) => ChatItem[]) => {
     setMessagesByConversation((current) => ({
@@ -274,6 +300,12 @@ function App() {
     setDraft('')
     setIsSending(true)
 
+    if (flowStage === 'awaitingCandidateDecision') {
+      await handleCandidateDecision(cleanText)
+      setIsSending(false)
+      return
+    }
+
     if (flowStage === 'collectingProfile') {
       const nextSnippets = [...profileSnippets, cleanText]
       const nextTurns = profileTurns + 1
@@ -285,7 +317,15 @@ function App() {
         const parsedProfile = mapBackendProfileToUserProfile(profileResult.profile, profileForm)
         setProfileForm(parsedProfile)
 
-        if (profileResult.is_sufficient) {
+        const hasCoreProfile = isProfileRequiredCompleted(parsedProfile)
+        if (hasCoreProfile && profileRefinementTurns < 2) {
+          setProfileRefinementTurns((current) => current + 1)
+          await botTypingThenText(nextProfileRefinementQuestion(parsedProfile, profileRefinementTurns), 700)
+          setIsSending(false)
+          return
+        }
+
+        if (profileResult.is_sufficient || hasCoreProfile) {
           await botTypingThenText(profileResult.assistant_reply || profileResult.natural_summary || buildProfileSummary(parsedProfile))
           appendToActive((current) => [
             ...current,
@@ -339,24 +379,27 @@ function App() {
     }
 
     if (action === 'show_candidate_card') {
-      appendToActive((current) => [
+      if (!candidateShownRef.current) {
+        candidateShownRef.current = true
+        appendToActive((current) => [
         ...current,
         {
           kind: 'candidateCard',
           id: crypto.randomUUID(),
           candidate: {
-            name: asString(payload.name) || '林知夏',
-            school: asString(payload.school) || '同济大学',
+            name: asString(payload.name) || buildCandidateFromProfile(profileForm).name,
+            school: asString(payload.school) || buildCandidateFromProfile(profileForm).school,
             studentId: asString(payload.student_id) || 'TJU-2024-1782',
-            major: asString(payload.major) || '工业设计',
-            grade: asString(payload.grade) || '大三',
-            focus: asString(payload.focus) || 'AI + 交互设计作品集',
-            bio: asString(payload.bio) || '最近在做校园服务机器人方向，想找跨校小伙伴一起冲比赛和作品集。',
-            tags: asStringArray(payload.tags),
+            major: asString(payload.major) || buildCandidateFromProfile(profileForm).major,
+            grade: asString(payload.grade) || buildCandidateFromProfile(profileForm).grade,
+            focus: asString(payload.focus) || buildCandidateFromProfile(profileForm).focus,
+            bio: asString(payload.bio) || buildCandidateFromProfile(profileForm).bio,
+            tags: asStringArray(payload.tags).length ? asStringArray(payload.tags) : buildCandidateFromProfile(profileForm).tags,
             avatarUrl: asString(payload.avatar_url) || CANDIDATE_AVATAR,
           },
         },
-      ])
+        ])
+      }
     }
 
     if (action === 'open_questionnaire') {
@@ -379,7 +422,7 @@ function App() {
         kind: 'text',
         id: crypto.randomUUID(),
         sender: 'bot',
-        text: reply.bot_message.text,
+        text: sanitizeWeChatText(reply.bot_message.text),
       },
     ])
 
@@ -391,12 +434,14 @@ function App() {
 
   const joinGroupConversation = (groupName: string) => {
     const groupId = `group:${groupName}`
-    const isFirstGroup = groupName === '沪上校园生存指南群'
-    const welcomeMessages = isFirstGroup ? firstGroupWelcomeMessages : secondGroupWelcomeMessages
+    if (conversations.some((item) => item.id === groupId)) {
+      setActiveConversationId(groupId)
+      return
+    }
+    const isFirstGroup = !candidateShownRef.current
+    const direction = profileForm.currentFocus || profileForm.seeking || '校园同频连接'
+    const welcomeMessages: ChatItem[] = [{ kind: 'text', id: crypto.randomUUID(), sender: 'bot', text: `欢迎来到「${groupName}」！这里围绕${direction}交流和组队，先看看大家正在做什么。` }]
     setConversations((current) => {
-      if (current.some((item) => item.id === groupId)) {
-        return current
-      }
       return [
         ...current,
         {
@@ -423,6 +468,7 @@ function App() {
     setActiveConversationId(groupId)
 
     if (isFirstGroup) {
+      candidateShownRef.current = true
       void revealCandidateAfterGroupJoin()
     } else {
       void revealIcebreakerAfterSecondGroup(groupId)
@@ -430,15 +476,16 @@ function App() {
   }
 
   const revealIcebreakerAfterSecondGroup = async (groupId: string) => {
+    const candidate = buildCandidateFromProfile(profileForm)
     await sleep(2200)
     await botTypingThenText(
-      '你们俩都是大三、都在做 AI 方向，林知夏在同济搞交互设计作品集，你在交大计算机转金融——方向挺互补的。认识一下吧，说不定能一起搞点事情～',
+      `你和${candidate.name}都在关注「${profileForm.currentFocus || profileForm.seeking || '这件事'}」，方向挺互补的。认识一下吧，说不定能一起把它推进。`,
       1200,
       groupId,
     )
     await sleep(1800)
     await botTypingThenText(
-      '你们都喜欢折腾项目，要不要一起去吃个饭聊聊？「四平路·老四川麻辣烫」离同济和交大都不远，他家是附近最麻辣的。用我们的码 DADAPAL5 可以抵 5 块钱，就当哒哒请你们的第一顿饭啦 🌶️',
+      '可以先约一次低压力的线上聊聊或校园散步：把想做的事拆成一个 30 分钟就能开始的小目标，再决定要不要继续组队。',
       1200,
       groupId,
     )
@@ -446,9 +493,10 @@ function App() {
   }
 
   const revealCandidateAfterGroupJoin = async () => {
+    const candidate = buildCandidateFromProfile(profileForm)
     await sleep(2600)
     await botTypingThenText(
-      '对了，我这边又帮你留意到一个人：同济大学大三的林知夏，她最近也在做 AI + 交互设计的作品集，想找跨校小伙伴一起冲比赛。要不要我帮你们加个好友认识一下？',
+      `对了，我这边留意到${candidate.school}${candidate.grade}的${candidate.name}，Ta 最近也在做「${candidate.focus}」。要不要先看看 Ta 的名片，再决定要不要认识？`,
       1200,
       'bot-main',
     )
@@ -457,21 +505,43 @@ function App() {
       {
         kind: 'candidateCard',
         id: crypto.randomUUID(),
-        candidate: {
-          name: '林知夏',
-          school: '同济大学',
-          studentId: 'TJU-2024-1782',
-          major: '工业设计',
-          grade: '大三',
-          focus: 'AI + 交互设计作品集',
-          bio: '最近在做校园服务机器人方向，想找跨校小伙伴一起冲比赛和作品集。',
-          tags: ['AI', '交互设计', '跨校组队'],
-          avatarUrl: CANDIDATE_AVATAR,
-        },
+        candidate,
       },
     ])
     setActiveConversationId('bot-main')
     setFlowStage('awaitingCandidateDecision')
+  }
+
+  const handleCandidateDecision = async (text: string) => {
+    const candidate = buildCandidateFromProfile(profileForm)
+    const normalized = text.replace(/\s/g, '')
+    const declines = /^(不|不要|不了|暂时不|先不了|算了|不用|没兴趣)/
+    const accepts = /^(要|想|可以|好|好的|行|愿意|牵线|认识|联系|加)/
+
+    if (declines.test(normalized)) {
+      await botTypingThenText(`没问题，我先不打扰你和${candidate.name}。之后想认识其他同学，随时和我说。`, 700)
+      setFlowStage('matchingLoop')
+      return
+    }
+
+    if (accepts.test(normalized)) {
+      await botTypingThenText(`好呀，我先帮你向${candidate.name}发出认识邀请。对方同意后，我会把你们拉进一个临时小群，方便先聊聊。`, 700)
+      appendToActive((current) => [
+        ...current,
+        {
+          kind: 'miniProgram',
+          id: crypto.randomUUID(),
+          title: `和 ${candidate.name} 认识一下`,
+          subtitle: '哒哒会先建一个临时小群，方便你们自然地打个招呼。',
+          buttonText: '拉进临时小群',
+          target: 'handoff',
+        },
+      ])
+      setFlowStage('matchingLoop')
+      return
+    }
+
+    await botTypingThenText(`名片已经在上面啦。你想让我帮你牵线认识${candidate.name}，还是先继续看看其他同学或群？`, 650)
   }
 
   const botTypingThenText = async (text: string, ms = 1200, conversationId?: string) => {
@@ -483,7 +553,7 @@ function App() {
       const withoutTyping = current.filter((item) => item.id !== typingId)
       return [
         ...withoutTyping,
-        { kind: 'text', id: crypto.randomUUID(), sender: 'bot', text },
+        { kind: 'text', id: crypto.randomUUID(), sender: 'bot', text: sanitizeWeChatText(text) },
       ]
     })
   }
@@ -493,15 +563,34 @@ function App() {
       setShowQuestionnaire(true)
       return
     }
-    appendToActive((current) => [
-      ...current,
-      {
-        kind: 'text',
-        id: crypto.randomUUID(),
-        sender: 'bot',
-        text: '对接信息已同步：微信号 AAA_dada_king，备注“哒哒牵线”我会优先通过你～',
-      },
-    ])
+    const candidate = buildCandidateFromProfile(profileForm)
+    const groupName = `哒哒牵线 · 你和${candidate.name}`
+    const groupId = `group:${groupName}`
+
+    if (!conversations.some((item) => item.id === groupId)) {
+      setConversations((current) => [
+        ...current,
+        { id: groupId, title: groupName, subtitle: '临时牵线群 · 已加入', badge: '群' },
+      ])
+      setMessagesByConversation((current) => ({
+        ...current,
+        [groupId]: [
+          {
+            kind: 'text',
+            id: crypto.randomUUID(),
+            sender: 'bot',
+            text: `欢迎来到临时牵线群！我把你和${candidate.name}拉进来啦。`,
+          },
+          {
+            kind: 'text',
+            id: crypto.randomUUID(),
+            sender: 'bot',
+            text: buildGroupIcebreaker(profileForm, candidate),
+          },
+        ],
+      }))
+    }
+    setActiveConversationId(groupId)
   }
 
   const onProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -530,7 +619,9 @@ function App() {
     ])
 
     await sleep(2000)
-    await botTypingThenText('我先给你一个几百人的群「沪上校园生存指南群」，你想先进去看看吗？')
+    const groupName = buildGroupName(profileForm, false)
+    await botTypingThenText(`我先给你一个围绕「${profileForm.currentFocus || profileForm.seeking || '校园同频'}」的群「${groupName}」，你想先进去看看吗？`)
+    appendToActive((current) => [...current, { kind: 'groupInvite', id: crypto.randomUUID(), groupName, description: `围绕${profileForm.currentFocus || profileForm.seeking || '校园同频'}交流、找搭子和约活动。` }])
     setFlowStage('awaitingPrimaryGroupDecision')
   }
 
@@ -578,7 +669,9 @@ function App() {
               setShowConversationList(false)
             }}
           >
-            <span className={`bot-dot ${item.badge === '群' ? 'muted' : ''}`}>{item.badge === '群' ? '群' : '搭'}</span>
+            {item.badge === '群'
+              ? <span className="bot-dot muted">群</span>
+              : <img className="bot-dot bot-avatar" alt="哒哒大王头像" src={BOT_AVATAR} />}
             <span>
               <strong>{item.title}</strong>
               <small>{item.subtitle}</small>
@@ -595,35 +688,26 @@ function App() {
         <header className="chat-header">
           <div className="main-header-title">
             <button className="conversation-back" type="button" onClick={() => setShowConversationList(true)} aria-label="返回对话列表">‹</button>
-            <span className={`mini-avatar ${inGroupConversation ? 'group-avatar' : ''}`}>{inGroupConversation ? '群' : '搭'}</span>
-            <div><strong>{activeConversation?.title ?? BOT_NAME}</strong><small>{inGroupConversation ? '微信群聊' : '微信对话'}</small></div>
+            {inGroupConversation
+              ? <span className="mini-avatar group-avatar">群</span>
+              : <img className="mini-avatar bot-avatar" alt="哒哒大王头像" src={BOT_AVATAR} />}
+            <div><strong>{isBotTyping ? '对方正在输入…' : activeConversation?.title ?? BOT_NAME}</strong><small>{inGroupConversation ? '微信群聊' : '@搭搭社交'}</small></div>
           </div>
           {!inGroupConversation && <span className="main-live">在线</span>}
         </header>
 
-        <div className="message-feed">
+        <div className="message-feed" ref={messageFeedRef}>
           {inGroupConversation ? (
             <>
               <div className="group-tip">你已加入群聊，先围观大家的分享吧～</div>
               {messages.map((message) => {
-                if (message.kind === 'typing') {
-                  return (
-                    <div className="message-row bot" key={message.id}>
-                      <div className="mini-avatar">群</div>
-                      <div className="typing-bubble" aria-label="输入中">
-                        <span />
-                        <span />
-                        <span />
-                      </div>
-                    </div>
-                  )
-                }
+                if (message.kind === 'typing') return null
                 if (message.kind === 'text') {
                   return (
                     <div className={`message-row ${message.sender}`} key={message.id}>
                       {message.sender === 'bot' ? <div className="mini-avatar">群</div> : null}
                       <p className="bubble">{message.text}</p>
-                      {message.sender === 'user' ? <img className="user-avatar" alt="你的头像" src={userAvatar} /> : null}
+                      {message.sender === 'user' ? <img className="user-avatar" alt="你的头像" src={userAvatar} onError={(event) => { event.currentTarget.src = DEFAULT_AVATAR }} /> : null}
                     </div>
                   )
                 }
@@ -631,23 +715,12 @@ function App() {
               })}
             </>
           ) : messages.map((message) => {
-            if (message.kind === 'typing') {
-              return (
-                <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">搭</div>
-                  <div className="typing-bubble" aria-label="输入中">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                </div>
-              )
-            }
+            if (message.kind === 'typing') return null
 
             if (message.kind === 'miniProgram') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">搭</div>
+                  <img className="mini-avatar bot-avatar" alt="哒哒大王头像" src={BOT_AVATAR} />
                   <div className="program-card">
                     <strong>{message.title}</strong>
                     <p>{message.subtitle}</p>
@@ -662,7 +735,7 @@ function App() {
             if (message.kind === 'groupInvite') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">搭</div>
+                  <img className="mini-avatar bot-avatar" alt="哒哒大王头像" src={BOT_AVATAR} />
                   <div className="group-card">
                     <strong>{message.groupName}</strong>
                     <p>{message.description}</p>
@@ -675,9 +748,9 @@ function App() {
             if (message.kind === 'profileCard') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">搭</div>
+                  <img className="mini-avatar bot-avatar" alt="哒哒大王头像" src={BOT_AVATAR} />
                   <article className="profile-card">
-                    <img alt="用户头像" src={message.profile.avatarUrl || DEFAULT_AVATAR} />
+                    <img alt="用户头像" src={message.profile.avatarUrl || DEFAULT_AVATAR} onError={(event) => { event.currentTarget.src = DEFAULT_AVATAR }} />
                     <div>
                       <h3>{message.profile.nickname || '未命名同学'}</h3>
                       <p>{message.profile.identity || '身份待补充'}</p>
@@ -698,9 +771,9 @@ function App() {
             if (message.kind === 'candidateCard') {
               return (
                 <div className="message-row bot" key={message.id}>
-                  <div className="mini-avatar">搭</div>
+                  <img className="mini-avatar bot-avatar" alt="哒哒大王头像" src={BOT_AVATAR} />
                   <article className="profile-card candidate-card">
-                    <img alt="候选同学头像" src={message.candidate.avatarUrl || CANDIDATE_AVATAR} />
+                    <img alt="候选同学头像" src={message.candidate.avatarUrl || CANDIDATE_AVATAR} onError={(event) => { event.currentTarget.src = CANDIDATE_AVATAR }} />
                     <div>
                       <h3>{message.candidate.name}</h3>
                       <p>{message.candidate.school} · {message.candidate.grade} · {message.candidate.major}</p>
@@ -720,9 +793,9 @@ function App() {
 
             return (
               <div className={`message-row ${message.sender}`} key={message.id}>
-                {message.sender === 'bot' ? <div className="mini-avatar">搭</div> : null}
+                {message.sender === 'bot' ? <img className="mini-avatar bot-avatar" alt="哒哒大王头像" src={BOT_AVATAR} /> : null}
                 <p className="bubble">{message.text}</p>
-                {message.sender === 'user' ? <img className="user-avatar" alt="你的头像" src={userAvatar} /> : null}
+                {message.sender === 'user' ? <img className="user-avatar" alt="你的头像" src={userAvatar} onError={(event) => { event.currentTarget.src = DEFAULT_AVATAR }} /> : null}
               </div>
             )
           })}
@@ -742,7 +815,7 @@ function App() {
             onChange={(event) => setDraft(event.target.value)}
             disabled={inGroupConversation}
           />
-          <button type="submit" disabled={isSending || inGroupConversation}>{isSending ? '发送中' : '发送'}</button>
+          <button type="submit" disabled={isSending || inGroupConversation}>发送</button>
         </form>
         <div className="main-home-indicator" aria-hidden="true" />
       </section>
@@ -750,40 +823,31 @@ function App() {
       {showQuestionnaire && (
         <div className="modal-backdrop" role="presentation" onClick={() => setShowQuestionnaire(false)}>
           <form className="questionnaire" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()} onSubmit={onProfileSubmit}>
-            <button className="close" type="button" onClick={() => setShowQuestionnaire(false)}>
-              关闭
-            </button>
-            <h2>哒哒校园档案小程序</h2>
-            <label>
-              昵称
-              <input value={profileForm.nickname} onChange={(event) => onFieldChange('nickname', event.target.value)} />
-            </label>
-            <label>
-              身份（年级/专业）
-              <input value={profileForm.identity} onChange={(event) => onFieldChange('identity', event.target.value)} />
-            </label>
-            <label>
-              城市
-              <input value={profileForm.city} onChange={(event) => onFieldChange('city', event.target.value)} />
-            </label>
-            <label>
-              最近在做什么
-              <input value={profileForm.currentFocus} onChange={(event) => onFieldChange('currentFocus', event.target.value)} />
-            </label>
-            <label>
-              想找什么
-              <textarea value={profileForm.seeking} onChange={(event) => onFieldChange('seeking', event.target.value)} rows={2} />
-            </label>
-            <label>
-              标签（逗号分隔）
-              <input value={profileForm.tags.join(', ')} onChange={(event) => onFieldChange('tags', event.target.value)} />
-            </label>
-            <label>
-              上传头像
-              <input type="file" accept="image/*" onChange={onAvatarUpload} />
-            </label>
+            <header className="questionnaire-header">
+              <div><span>搭搭社交 · 小程序</span><h2>我的校园连接卡</h2><p>补全后，哒哒会按你的方向找人、找群和安排破冰。</p></div>
+              <button className="close" type="button" onClick={() => setShowQuestionnaire(false)} aria-label="关闭档案">×</button>
+            </header>
+            <div className="questionnaire-preview">
+              <img src={userAvatar} alt="你的头像预览" onError={(event) => { event.currentTarget.src = DEFAULT_AVATAR }} />
+              <div><small>校园连接档案</small><strong>{profileForm.nickname || '未命名同学'}</strong><p>{profileForm.identity || '填写年级和专业'}</p></div>
+              <b>完成度 {isProfileRequiredCompleted(profileForm) ? '100%' : '进行中'}</b>
+            </div>
+            <div className="questionnaire-section"><h3>基本坐标 <small>必填</small></h3><div className="questionnaire-grid">
+              <label>昵称<input placeholder="怎么称呼你" value={profileForm.nickname} onChange={(event) => onFieldChange('nickname', event.target.value)} /></label>
+              <label>所在城市<input placeholder="例如：上海" value={profileForm.city} onChange={(event) => onFieldChange('city', event.target.value)} /></label>
+              <label className="full-width">身份（学校 · 年级 · 专业）<input placeholder="例如：上海交大 · 大三 · 计算机" value={profileForm.identity} onChange={(event) => onFieldChange('identity', event.target.value)} /></label>
+            </div></div>
+            <div className="questionnaire-section"><h3>这次想连接什么 <small>必填</small></h3><div className="questionnaire-grid">
+              <label className="full-width">最近在做什么<input placeholder="例如：准备 AI 实习、做项目、探索校园" value={profileForm.currentFocus} onChange={(event) => onFieldChange('currentFocus', event.target.value)} /></label>
+              <label className="full-width">想认识什么样的人<textarea placeholder="说说希望对方能和你一起做什么" value={profileForm.seeking} onChange={(event) => onFieldChange('seeking', event.target.value)} rows={3} /></label>
+            </div></div>
+            <div className="questionnaire-section optional"><h3>让匹配更准 <small>选填</small></h3><div className="questionnaire-grid">
+              <label>兴趣标签<input placeholder="AI、跑步、创业（用逗号分隔）" value={profileForm.tags.join(', ')} onChange={(event) => onFieldChange('tags', event.target.value)} /></label>
+              <label>头像<input type="file" accept="image/*" onChange={onAvatarUpload} /></label>
+            </div></div>
             <div className="form-actions">
-              <button type="submit">提交并生成至尊学生证</button>
+              <button type="submit">保存连接卡，开始找搭子 <span>→</span></button>
+              <p>仅用于本次体验中的匹配与破冰，不会公开展示。</p>
             </div>
           </form>
         </div>
